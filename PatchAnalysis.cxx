@@ -9,7 +9,6 @@
 #include "vnl/vnl_matrix.h"
 #include "itkMatrix.h"
 #include "itkImageRegionIteratorWithIndex.h"
-#include "itkImportImageFilter.h"
 #include "itkCSVNumericObjectFileWriter.h"
 
 using namespace std; 
@@ -30,26 +29,6 @@ int main(int, char * argv[] )
   typedef itk::Image< InputPixelType, 2 > VectorizedPatchImageType; 
   VectorizedPatchImageType::Pointer VectorizedPatchImage = 
                                     VectorizedPatchImageType::New(); 
-  typedef itk::ImportImageFilter< InputPixelType, Dimension > ImportFilterType;
-  ImportFilterType::Pointer importFilter = ImportFilterType::New();
-  ImportFilterType::SizeType size;
-  size[0] = NumberOfPatches; // size along X
-  size[1] = VolumeOfPatches; // size along Y
-  ImportFilterType::IndexType start;
-  start.Fill( 0 );
-  ImportFilterType::RegionType region;
-  region.SetIndex( start );
-  region.SetSize( size );
-  importFilter->SetRegion( region );
-  double origin[ 2 ];
-  origin[0] = 0.0; // X coordinate
-  origin[1] = 0.0; // Y coordinate
-  importFilter->SetOrigin( origin );
-  double spacing[ 2 ];
-  spacing[0] = 1.0; // along X direction
-  spacing[1] = 1.0; // along Y direction
-  importFilter->SetSpacing( spacing );
-
 
   typedef itk::ImageFileReader< InputImageType > ReaderType;
   ReaderType::Pointer  inputImageReader = ReaderType::New();
