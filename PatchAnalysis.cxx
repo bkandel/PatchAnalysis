@@ -10,6 +10,7 @@
 #include "itkMatrix.h"
 #include "itkImageRegionIteratorWithIndex.h"
 #include "itkCSVNumericObjectFileWriter.h"
+#include <vnl/algo/vnl_svd.h>
 
 using namespace std; 
 
@@ -17,7 +18,7 @@ int main(int, char * argv[] )
 {
   typedef float       InputPixelType; 
   const unsigned int  Dimension = 3; // assume 3d images 
-  const unsigned int  NumberOfPatches = 30; 
+  const unsigned int  NumberOfPatches = 1000; 
   const unsigned int  SizeOfPatches = 5;
   const unsigned int  VolumeOfPatches = 125; // illegal: pow(SizeOfPatches, Dimension);  
 
@@ -34,7 +35,8 @@ int main(int, char * argv[] )
   ReaderType::Pointer  inputImageReader = ReaderType::New();
   ReaderType::Pointer  maskImageReader  = ReaderType::New(); 
   typedef itk::CSVNumericObjectFileWriter< InputPixelType, NumberOfPatches, VolumeOfPatches > WriterType; 
-  WriterType::Pointer writer = WriterType::New(); 
+  WriterType::Pointer patchWriter = WriterType::New(); 
+  WriterType::Pointer eigvecWriter = WriterType::New(); 
 
 /*  typedef itk::Matrix< InputPixelType, 
                        NumberOfPatches, 
@@ -46,6 +48,7 @@ int main(int, char * argv[] )
   const char * inputFilename = argv[1];
   const char * maskFilename  = argv[2]; 
   const char * outputFilename = argv[3];
+  const char * eigvecFilename = argv[4]; 
   inputImageReader->SetFileName( inputFilename );
   inputImageReader->Update();
   maskImageReader->SetFileName( maskFilename ); 
@@ -86,26 +89,10 @@ int main(int, char * argv[] )
     } 
     ++PatchSeedAttemptIterator; 
   }
-/*  InputImageType::IndexType start;
-  start.Fill(100);
- 
-  InputImageType::SizeType patchSize;
-  patchSize.Fill(10);
-
-  InputImageType::RegionType desiredPatch(start,patchSize);
- 
-  extractFilter->SetRegionOfInterest(desiredPatch);
-  extractFilter->SetInput(inputImageReader->GetOutput());
-  extractFilter->Update();
-
-  writer->SetInput( extractFilter->GetOutput() ); 
-  writer->SetFileName ( outputFilename ); 
-  writer->Update(); 
-*/
+  
   cout << "Found " << PatchSeedIterator << 
           " points in " << PatchSeedAttemptIterator << 
           " attempts." << endl;
-  cout << PatchSeedPoints << endl; 
   
   for( int i = 0; i < NumberOfPatches; ++i)
   {
@@ -128,9 +115,15 @@ int main(int, char * argv[] )
       ++j;  
     }
   }
-  writer->SetFileName ( outputFilename ); 
-  writer->SetInput( &VectorizedPatchMatrix ); 
-  writer->Update(); 
+  vnl_svd< InputPixelType > svd( VectorizedPatchMatrix ); 
+  vnl_matrix< InputPixelType > PatchEigenvectors = svd.V();  
+  patchWriter->SetFileName( outputFilename ); 
+  patchWriter->SetInput( &VectorizedPatchMatrix ); 
+  patchWriter->Update(); 
+
+  eigvecWriter->SetFileName( eigvecFilename ); 
+  eigvecWriter->SetInput( &PatchEigenvectors); 
+  eigvecWriter->Update(); 
 
   return 0;   
 }
