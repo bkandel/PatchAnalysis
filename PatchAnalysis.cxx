@@ -7,15 +7,20 @@
 #include "itkImageFileWriter.h"
 #include "itkRegionOfInterestImageFilter.h"
 #include "vnl/vnl_matrix.h"
-#include "itkMatrix.h"
 #include "itkImageRegionIteratorWithIndex.h"
 #include "itkCSVNumericObjectFileWriter.h"
 #include <vnl/algo/vnl_svd.h>
 
 using namespace std; 
 
-int main(int, char * argv[] )
+int main(int argc, char * argv[] )
 {
+  if( argc < 5) 
+  {
+    cout << "Usage: " << argv[0] << 
+       " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename " << endl; 
+    return 1; 
+  }
   typedef float       InputPixelType; 
   const unsigned int  Dimension = 3; // assume 3d images 
   const unsigned int  NumberOfPatches = 1000; 
@@ -27,21 +32,14 @@ int main(int, char * argv[] )
   InputImageType::Pointer MaskImage  = InputImageType::New();  
   InputImageType::Pointer PatchImage = InputImageType::New(); 
 
-  typedef itk::Image< InputPixelType, 2 > VectorizedPatchImageType; 
-  VectorizedPatchImageType::Pointer VectorizedPatchImage = 
-                                    VectorizedPatchImageType::New(); 
-
   typedef itk::ImageFileReader< InputImageType > ReaderType;
   ReaderType::Pointer  inputImageReader = ReaderType::New();
   ReaderType::Pointer  maskImageReader  = ReaderType::New(); 
-  typedef itk::CSVNumericObjectFileWriter< InputPixelType, NumberOfPatches, VolumeOfPatches > WriterType; 
+  typedef itk::CSVNumericObjectFileWriter< InputPixelType, 
+                         NumberOfPatches, VolumeOfPatches > WriterType; 
   WriterType::Pointer patchWriter = WriterType::New(); 
   WriterType::Pointer eigvecWriter = WriterType::New(); 
 
-/*  typedef itk::Matrix< InputPixelType, 
-                       NumberOfPatches, 
-                       VolumeOfPatches > MatrixType; 
-  MatrixType VectorizedPatchMatrix;*/
   vnl_matrix< InputPixelType > VectorizedPatchMatrix(NumberOfPatches, VolumeOfPatches); 
   VectorizedPatchMatrix.fill( 0 );  
 
@@ -75,12 +73,10 @@ int main(int, char * argv[] )
   InputImageType::IndexType PatchIndex;  
   while( PatchSeedIterator < NumberOfPatches) 
   {
-    TestPatchSeed( 0 ) = rand() % inputSize[0]; 
-    TestPatchSeed( 1 ) = rand() % inputSize[1]; 
-    TestPatchSeed( 2 ) = rand() % inputSize[2];
-    PatchIndex[0] = TestPatchSeed(0);
-    PatchIndex[1] = TestPatchSeed(1); 
-    PatchIndex[2] = TestPatchSeed(2); 
+    for( int i = 0; i < Dimension; ++i)
+    {
+      PatchIndex[ i ] = TestPatchSeed( i ) = rand() % inputSize[ i ]; 
+    }
     InputPixelType MaskValue = MaskImage->GetPixel( PatchIndex ); 
     if( MaskValue > 0 )
     {
