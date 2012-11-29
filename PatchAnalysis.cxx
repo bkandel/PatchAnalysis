@@ -7,6 +7,7 @@
 #include "itkImageFileWriter.h"
 #include "itkRegionOfInterestImageFilter.h"
 #include "vnl/vnl_matrix.h"
+#include "itkNeighborhoodIterator.h"
 #include "itkImageRegionIteratorWithIndex.h"
 #include "itkCSVNumericObjectFileWriter.h"
 #include <vnl/algo/vnl_svd.h>
@@ -24,8 +25,8 @@ int main(int argc, char * argv[] )
   typedef float       InputPixelType; 
   const unsigned int  Dimension = 3; // assume 3d images 
   const unsigned int  NumberOfPatches = 1000; 
-  const unsigned int  SizeOfPatches = 5;
-  const unsigned int  VolumeOfPatches = 125; // illegal: pow(SizeOfPatches, Dimension);  
+  const unsigned int  SizeOfPatches = 3;
+  const unsigned int  VolumeOfPatches = 343; // illegal: pow(SizeOfPatches, Dimension);  
 
   typedef itk::Image< InputPixelType, Dimension >   InputImageType;
   InputImageType::Pointer InputImage = InputImageType::New();
@@ -40,8 +41,6 @@ int main(int argc, char * argv[] )
   WriterType::Pointer patchWriter = WriterType::New(); 
   WriterType::Pointer eigvecWriter = WriterType::New(); 
 
-  vnl_matrix< InputPixelType > VectorizedPatchMatrix(NumberOfPatches, VolumeOfPatches); 
-  VectorizedPatchMatrix.fill( 0 );  
 
   const char * inputFilename = argv[1];
   const char * maskFilename  = argv[2]; 
@@ -89,34 +88,79 @@ int main(int argc, char * argv[] )
   cout << "Found " << PatchSeedIterator << 
           " points in " << PatchSeedAttemptIterator << 
           " attempts." << endl;
-  
+  // allocate matrix based on radial size of patch
+  int i = 0; 
+  for( int j = 0; j < Dimension; ++j)
+  {
+    PatchIndex[ j ] = PatchSeedPoints( i, j ); 
+  } 
+  typedef itk::NeighborhoodIterator< InputImageType > IteratorType;
+  IteratorType::RadiusType radius;
+  radius.Fill( SizeOfPatches );
+  IteratorType Iterator( radius, inputImageReader->GetOutput(),
+                           inputImageReader->GetOutput()->GetRequestedRegion() );
+    typedef typename InputImageType::IndexType IndexType;
+    IndexType PatchCenterIndex;
+    PatchCenterIndex.Fill( SizeOfPatches );
+    Iterator.SetLocation( PatchCenterIndex );
+    // get indices within N-d sphere
+    vector< unsigned int > IndicesWithinSphere;
+    for( int ii = 0; ii < Iterator.Size(); ++ii)
+    {
+      IndexType Index = Iterator.GetIndex( ii );
+      float DistanceFromPatchCenter = 0.0;
+      for( int jj = 0; jj < Dimension; ++jj)
+      {
+        DistanceFromPatchCenter +=
+           ( Index[jj] - PatchCenterIndex[jj] ) *
+           ( Index[jj] - PatchCenterIndex[jj] );
+      }
+      DistanceFromPatchCenter = sqrt(DistanceFromPatchCenter);
+      if( DistanceFromPatchCenter <= SizeOfPatches )
+      {
+        IndicesWithinSphere.push_back( ii );
+      }
+    }
+    cout << Iterator.Size() << endl;
+    cout << IndicesWithinSphere.size() << endl;
+  vnl_matrix< InputPixelType > VectorizedPatchMatrix(NumberOfPatches, IndicesWithinSphere.size() ); 
+  VectorizedPatchMatrix.fill( 0 );  
   for( int i = 0; i < NumberOfPatches; ++i)
   {
-    int j = 0; 
-    PatchIndex[ 0 ] = PatchSeedPoints( i, 0 );
-    PatchIndex[ 1 ] = PatchSeedPoints( i, 1 );  
-    PatchIndex[ 2 ] = PatchSeedPoints( i, 2 );
-    InputImageType::RegionType desiredPatch( PatchIndex, PatchSize ); 
-    extractFilter->SetRegionOfInterest( desiredPatch );
-    extractFilter->SetInput( inputImageReader->GetOutput() );
-    extractFilter->Update();  
-    PatchImage = extractFilter->GetOutput(); 
-    typedef itk::ImageRegionIteratorWithIndex< InputImageType > Iterator; 
-    Iterator patchIterator( PatchImage, 
-                            PatchImage->GetLargestPossibleRegion() ); 
-    for( patchIterator.GoToBegin(); !patchIterator.IsAtEnd(); ++patchIterator)
+    PatchCenterIndex[ 0 ] = PatchSeedPoints( i, 0 );
+    PatchCenterIndex[ 1 ] = PatchSeedPoints( i, 1 );  
+    PatchCenterIndex[ 2 ] = PatchSeedPoints( i, 2 );
+    Iterator.SetLocation( PatchCenterIndex ); 
+    // get indices within N-d sphere
+    for( int j = 0; j < IndicesWithinSphere.size(); ++j)
     {
-      InputPixelType PatchValue = patchIterator.Get(); 
-      VectorizedPatchMatrix( i, j ) = PatchValue; 
-      ++j;  
+      VectorizedPatchMatrix( i, j ) = Iterator.GetPixel( j ); 
     }
   }
   vnl_svd< InputPixelType > svd( VectorizedPatchMatrix ); 
   vnl_matrix< InputPixelType > PatchEigenvectors = svd.V();  
+  double SumOfEigenvalues = 0.0; 
+  for( int i = 0; i < svd.rank(); i++)
+  {
+    SumOfEigenvalues += svd.W(i, i); 
+  }
+  double PartialSumOfEigenvalues = 0.0; 
+  double PercentVarianceExplained = 0.0; 
+  double TargetPercentVarianceExplained = 0.85; 
+  i = 0; 
+  while( PercentVarianceExplained < TargetPercentVarianceExplained && i < svd.rank())
+  {
+    PartialSumOfEigenvalues += svd.W(i, i); 
+    PercentVarianceExplained = PartialSumOfEigenvalues / 
+                                      SumOfEigenvalues; 
+    i++; 
+  }
+  cout << "It took " << i << " eigenvalues to reach " << 
+       TargetPercentVarianceExplained * 100 << "% variance explained." << endl;
   patchWriter->SetFileName( outputFilename ); 
   patchWriter->SetInput( &VectorizedPatchMatrix ); 
   patchWriter->Update(); 
-
+  cout << "Rank of svd is " << svd.rank() << "." << endl;
   eigvecWriter->SetFileName( eigvecFilename ); 
   eigvecWriter->SetInput( &PatchEigenvectors); 
   eigvecWriter->Update(); 
