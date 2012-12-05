@@ -11,6 +11,9 @@
 #include "itkImageRegionIteratorWithIndex.h"
 #include "itkCSVNumericObjectFileWriter.h"
 #include <vnl/algo/vnl_svd.h>
+#include <itkStatisticsImageFilter.h>
+#include "itkImageRegionIterator.h"
+#include "PatchAnalysis.hxx"
 
 using namespace std; 
 
@@ -88,6 +91,8 @@ int main(int argc, char * argv[] )
   cout << "Found " << PatchSeedIterator << 
           " points in " << PatchSeedAttemptIterator << 
           " attempts." << endl;
+
+  
   // allocate matrix based on radial size of patch
   int i = 0; 
   for( int j = 0; j < Dimension; ++j)
@@ -99,30 +104,32 @@ int main(int argc, char * argv[] )
   radius.Fill( SizeOfPatches );
   IteratorType Iterator( radius, inputImageReader->GetOutput(),
                            inputImageReader->GetOutput()->GetRequestedRegion() );
-    typedef typename InputImageType::IndexType IndexType;
-    IndexType PatchCenterIndex;
-    PatchCenterIndex.Fill( SizeOfPatches );
-    Iterator.SetLocation( PatchCenterIndex );
-    // get indices within N-d sphere
-    vector< unsigned int > IndicesWithinSphere;
-    for( int ii = 0; ii < Iterator.Size(); ++ii)
+  typedef typename InputImageType::IndexType IndexType;
+  IndexType PatchCenterIndex;
+  PatchCenterIndex.Fill( SizeOfPatches );
+  Iterator.SetLocation( PatchCenterIndex );
+  // get indices within N-d sphere
+  vector< unsigned int > IndicesWithinSphere;
+  for( int ii = 0; ii < Iterator.Size(); ++ii)
+  {
+    IndexType Index = Iterator.GetIndex( ii );
+    float DistanceFromPatchCenter = 0.0;
+    for( int jj = 0; jj < Dimension; ++jj)
     {
-      IndexType Index = Iterator.GetIndex( ii );
-      float DistanceFromPatchCenter = 0.0;
-      for( int jj = 0; jj < Dimension; ++jj)
-      {
-        DistanceFromPatchCenter +=
-           ( Index[jj] - PatchCenterIndex[jj] ) *
-           ( Index[jj] - PatchCenterIndex[jj] );
-      }
-      DistanceFromPatchCenter = sqrt(DistanceFromPatchCenter);
-      if( DistanceFromPatchCenter <= SizeOfPatches )
-      {
-        IndicesWithinSphere.push_back( ii );
-      }
+      DistanceFromPatchCenter +=
+         ( Index[jj] - PatchCenterIndex[jj] ) *
+         ( Index[jj] - PatchCenterIndex[jj] );
     }
-    cout << Iterator.Size() << endl;
-    cout << IndicesWithinSphere.size() << endl;
+    DistanceFromPatchCenter = sqrt(DistanceFromPatchCenter);
+    if( DistanceFromPatchCenter <= SizeOfPatches )
+    {
+      IndicesWithinSphere.push_back( ii );
+    }
+  }
+  cout << Iterator.Size() << endl;
+  cout << IndicesWithinSphere.size() << endl;
+
+  // populate matrix with patch values from points in image
   vnl_matrix< InputPixelType > VectorizedPatchMatrix(NumberOfPatches, IndicesWithinSphere.size() ); 
   VectorizedPatchMatrix.fill( 0 );  
   for( int i = 0; i < NumberOfPatches; ++i)
@@ -137,6 +144,8 @@ int main(int argc, char * argv[] )
       VectorizedPatchMatrix( i, j ) = Iterator.GetPixel( j ); 
     }
   }
+  
+  //compute eigendecomposition of patch matrix
   vnl_svd< InputPixelType > svd( VectorizedPatchMatrix ); 
   vnl_matrix< InputPixelType > PatchEigenvectors = svd.V();  
   double SumOfEigenvalues = 0.0; 
@@ -157,13 +166,67 @@ int main(int argc, char * argv[] )
   }
   cout << "It took " << i << " eigenvalues to reach " << 
        TargetPercentVarianceExplained * 100 << "% variance explained." << endl;
+  vnl_matrix< InputPixelType > SignificantPatchEigenvectors; 
+  SignificantPatchEigenvectors = PatchEigenvectors.get_n_columns(0, i);
+  string SignificantEigvecFilename = "significantEigenvectors.csv";
+  
   patchWriter->SetFileName( outputFilename ); 
   patchWriter->SetInput( &VectorizedPatchMatrix ); 
   patchWriter->Update(); 
-  cout << "Rank of svd is " << svd.rank() << "." << endl;
   eigvecWriter->SetFileName( eigvecFilename ); 
   eigvecWriter->SetInput( &PatchEigenvectors); 
   eigvecWriter->Update(); 
+
+  eigvecWriter->SetFileName( SignificantEigvecFilename ); 
+  eigvecWriter->SetInput( &SignificantPatchEigenvectors ); 
+  eigvecWriter->Update();
+  
+  // find total number of non-zero points in mask and store indices
+  // WARNING: ASSUMES MASK IS BINARY!!
+  typedef itk::StatisticsImageFilter< InputImageType > StatisticsFilterType; 
+  StatisticsFilterType::Pointer StatisticsFilter = StatisticsFilterType::New(); 
+  StatisticsFilter->SetInput(MaskImage); 
+  StatisticsFilter->Update(); 
+  double SumOfMaskImage = StatisticsFilter->GetSum();
+  cout << "Total number of possible points: " << SumOfMaskImage << "." << endl;
+  vnl_matrix< int > NonZeroMaskIndices( SumOfMaskImage, Dimension ); 
+  typedef  itk::ImageRegionIterator< InputImageType > ImageIteratorType; 
+  ImageIteratorType MaskImageIterator( MaskImage , MaskImage->GetLargestPossibleRegion());
+  
+  int MaskImagePointIter = 0;
+  for(MaskImageIterator.GoToBegin(); !MaskImageIterator.IsAtEnd(); ++MaskImageIterator)
+  {
+    if( MaskImageIterator.Get() > 0 )
+    {
+      for( int i = 0; i < Dimension; i++)
+      {
+        NonZeroMaskIndices(MaskImagePointIter, i) = MaskImageIterator.GetIndex()[i]; 
+      }
+      MaskImagePointIter++; 
+    }
+  }
+  cout << "Number of points is " << MaskImagePointIter << endl;
+
+  // generate patches for all points in mask
+  vnl_matrix< InputPixelType > PatchesForAllPointsWithinMask( IndicesWithinSphere.size(), SumOfMaskImage);
+  PatchesForAllPointsWithinMask.fill( 0 ); 
+  for( int i = 0; i < SumOfMaskImage; ++i)
+  {  
+    for( int j = 0; j < Dimension; ++j)
+    {
+      PatchCenterIndex[ j ] = NonZeroMaskIndices(i, j);
+    }
+    Iterator.SetLocation( PatchCenterIndex );
+    // get indices within N-d sphere
+    for( int j = 0; j < IndicesWithinSphere.size(); ++j)
+    {
+      PatchesForAllPointsWithinMask( j, i ) = Iterator.GetPixel( j );
+    }
+  }
+  patchWriter->SetFileName( "PatchesForAllPoints.csv" ); 
+  patchWriter->SetInput( &PatchesForAllPointsWithinMask ); 
+  patchWriter->Update(); 
+
 
   return 0;   
 }
