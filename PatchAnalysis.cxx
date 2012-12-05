@@ -25,11 +25,12 @@ int main(int argc, char * argv[] )
        " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename " << endl; 
     return 1; 
   }
-  typedef float       InputPixelType; 
-  const unsigned int  Dimension = 3; // assume 3d images 
+  typedef double       InputPixelType; 
+  const unsigned int  Dimension = 2; // assume 2d images 
   const unsigned int  NumberOfPatches = 1000; 
   const unsigned int  SizeOfPatches = 3;
-  const unsigned int  VolumeOfPatches = 343; // illegal: pow(SizeOfPatches, Dimension);  
+  const unsigned int  VolumeOfPatches = 49; //343; // illegal: pow(SizeOfPatches, Dimension);  
+  double TargetPercentVarianceExplained = 0.95; 
 
   typedef itk::Image< InputPixelType, Dimension >   InputImageType;
   InputImageType::Pointer InputImage = InputImageType::New();
@@ -134,9 +135,10 @@ int main(int argc, char * argv[] )
   VectorizedPatchMatrix.fill( 0 );  
   for( int i = 0; i < NumberOfPatches; ++i)
   {
-    PatchCenterIndex[ 0 ] = PatchSeedPoints( i, 0 );
-    PatchCenterIndex[ 1 ] = PatchSeedPoints( i, 1 );  
-    PatchCenterIndex[ 2 ] = PatchSeedPoints( i, 2 );
+    for( int j = 0; j < Dimension; ++j)
+    {
+      PatchCenterIndex[ j ] = PatchSeedPoints( i, j ); 
+    }
     Iterator.SetLocation( PatchCenterIndex ); 
     // get indices within N-d sphere
     for( int j = 0; j < IndicesWithinSphere.size(); ++j)
@@ -148,6 +150,8 @@ int main(int argc, char * argv[] )
   //compute eigendecomposition of patch matrix
   vnl_svd< InputPixelType > svd( VectorizedPatchMatrix ); 
   vnl_matrix< InputPixelType > PatchEigenvectors = svd.V();  
+  cout << "PatchEigenvectors is " << PatchEigenvectors.rows() << 
+    "x" << PatchEigenvectors.columns() << "." << endl;
   double SumOfEigenvalues = 0.0; 
   for( int i = 0; i < svd.rank(); i++)
   {
@@ -155,7 +159,6 @@ int main(int argc, char * argv[] )
   }
   double PartialSumOfEigenvalues = 0.0; 
   double PercentVarianceExplained = 0.0; 
-  double TargetPercentVarianceExplained = 0.85; 
   i = 0; 
   while( PercentVarianceExplained < TargetPercentVarianceExplained && i < svd.rank())
   {
@@ -164,7 +167,8 @@ int main(int argc, char * argv[] )
                                       SumOfEigenvalues; 
     i++; 
   }
-  cout << "It took " << i << " eigenvalues to reach " << 
+  int NumberOfSignificantEigenvectors = i; 
+  cout << "It took " << NumberOfSignificantEigenvectors << " eigenvalues to reach " << 
        TargetPercentVarianceExplained * 100 << "% variance explained." << endl;
   vnl_matrix< InputPixelType > SignificantPatchEigenvectors; 
   SignificantPatchEigenvectors = PatchEigenvectors.get_n_columns(0, i);
@@ -207,8 +211,9 @@ int main(int argc, char * argv[] )
   }
   cout << "Number of points is " << MaskImagePointIter << endl;
 
+  
   // generate patches for all points in mask
-  vnl_matrix< InputPixelType > PatchesForAllPointsWithinMask( IndicesWithinSphere.size(), SumOfMaskImage);
+  vnl_matrix< InputPixelType > PatchesForAllPointsWithinMask( IndicesWithinSphere.size(),  SumOfMaskImage);
   PatchesForAllPointsWithinMask.fill( 0 ); 
   for( int i = 0; i < SumOfMaskImage; ++i)
   {  
@@ -223,10 +228,36 @@ int main(int argc, char * argv[] )
       PatchesForAllPointsWithinMask( j, i ) = Iterator.GetPixel( j );
     }
   }
-  patchWriter->SetFileName( "PatchesForAllPoints.csv" ); 
-  patchWriter->SetInput( &PatchesForAllPointsWithinMask ); 
-  patchWriter->Update(); 
+  cout << "Recorded patches for all points." << endl;
 
-
+  // perform regression from eigenvectors to images
+  // Ax = b, where A is eigenvector matrix (number of indices
+  // within patch x number of eigenvectors), x is coefficients 
+  // (number of eigenvectors x 1), b is patch values for a given index
+  // (number of indices within patch x 1).
+  cout << "Computing regression." << endl;
+  vnl_matrix< InputPixelType > 
+    EigenvectorCoefficients( NumberOfSignificantEigenvectors, SumOfMaskImage ); 
+  EigenvectorCoefficients.fill( 0 );
+  vnl_svd< InputPixelType > RegressionSVD(SignificantPatchEigenvectors);  
+//  EigenvectorCoefficients =  RegressionSVD.solve(PatchesForAllPointsWithinMask); 
+//  not feasible for large matrices
+  for( int i = 0; i < SumOfMaskImage; ++i)
+  {
+    vnl_vector< InputPixelType > PatchOfInterest = 
+      PatchesForAllPointsWithinMask.get_column(i);
+//    cout << "PatchOfInterest: " << PatchOfInterest << endl; 
+    vnl_vector< InputPixelType > x( NumberOfSignificantEigenvectors ); 
+    x.fill( 0 );
+//    if(i % 100000 == 0) cout << "Computed " << i << " out of " << SumOfMaskImage << "regressions." << endl;
+    
+    x = RegressionSVD.solve(PatchOfInterest); 
+    EigenvectorCoefficients.set_column(i, x);
+  }
+  patchWriter->SetFileName( "eigenvectorCoefficients.csv" );
+  patchWriter->SetInput( &EigenvectorCoefficients );
+  patchWriter->Update();
+  
+  cout << "Done!" << endl;
   return 0;   
 }

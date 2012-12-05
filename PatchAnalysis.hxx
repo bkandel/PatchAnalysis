@@ -5,6 +5,8 @@
 #include "vnl/vnl_vector.h"
 #include "vnl/algo/vnl_conjugate_gradient.h"
 #include "vnl/vnl_cost_function.h"
+#include "vnl/algo/vnl_amoeba.h"
+#include "vnl/algo/vnl_lbfgs.h"
 
 class LeastSquaresFunctor : public vnl_cost_function
 {
