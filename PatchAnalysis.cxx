@@ -131,7 +131,7 @@ int main(int argc, char * argv[] )
   cout << IndicesWithinSphere.size() << endl;
 
   // populate matrix with patch values from points in image
-  vnl_matrix< InputPixelType > VectorizedPatchMatrix(NumberOfPatches, IndicesWithinSphere.size() ); 
+  vnl_matrix< InputPixelType > VectorizedPatchMatrix( NumberOfPatches, IndicesWithinSphere.size() ); 
   VectorizedPatchMatrix.fill( 0 );  
   for( int i = 0; i < NumberOfPatches; ++i)
   {
@@ -257,7 +257,10 @@ int main(int argc, char * argv[] )
   patchWriter->SetFileName( "eigenvectorCoefficients.csv" );
   patchWriter->SetInput( &EigenvectorCoefficients );
   patchWriter->Update();
-  
+  vnl_matrix< InputPixelType > ReconstructedPatches = SignificantPatchEigenvectors * EigenvectorCoefficients; 
+  vnl_matrix< InputPixelType > Error = ReconstructedPatches - PatchesForAllPointsWithinMask; 
+  cout << "Error is " << Error.array_two_norm() << " as compared to norm of " 
+    << PatchesForAllPointsWithinMask.absolute_value_sum() << "." << endl;
   cout << "Done!" << endl;
   return 0;   
 }
