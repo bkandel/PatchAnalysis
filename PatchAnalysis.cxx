@@ -146,7 +146,8 @@ int main(int argc, char * argv[] )
       VectorizedPatchMatrix( i, j ) = Iterator.GetPixel( j ); 
     }
   }
-  
+  cout << "VectorizedPatchMatrix is " << VectorizedPatchMatrix.rows() << 
+    "x" << VectorizedPatchMatrix.cols() << "." << endl;
   //compute eigendecomposition of patch matrix
   vnl_svd< InputPixelType > svd( VectorizedPatchMatrix ); 
   vnl_matrix< InputPixelType > PatchEigenvectors = svd.V();  
@@ -173,6 +174,8 @@ int main(int argc, char * argv[] )
   vnl_matrix< InputPixelType > SignificantPatchEigenvectors; 
   SignificantPatchEigenvectors = PatchEigenvectors.get_n_columns(0, i);
   string SignificantEigvecFilename = "significantEigenvectors.csv";
+  cout << "SignificantPatchEigenvectors is " << SignificantPatchEigenvectors.rows() << 
+    "x" << SignificantPatchEigenvectors.columns() << "." << endl;
   
   patchWriter->SetFileName( outputFilename ); 
   patchWriter->SetInput( &VectorizedPatchMatrix ); 
@@ -258,9 +261,20 @@ int main(int argc, char * argv[] )
   patchWriter->SetInput( &EigenvectorCoefficients );
   patchWriter->Update();
   vnl_matrix< InputPixelType > ReconstructedPatches = SignificantPatchEigenvectors * EigenvectorCoefficients; 
-  vnl_matrix< InputPixelType > Error = ReconstructedPatches - PatchesForAllPointsWithinMask; 
-  cout << "Error is " << Error.array_two_norm() << " as compared to norm of " 
-    << PatchesForAllPointsWithinMask.absolute_value_sum() << "." << endl;
-  cout << "Done!" << endl;
+  vnl_matrix< InputPixelType > Error = ReconstructedPatches - PatchesForAllPointsWithinMask;
+  vnl_vector< InputPixelType > PercentError(Error.columns() ); 
+  for( int i = 0; i < Error.columns(); ++i)
+  {
+    PercentError(i) = Error.get_column(i).two_norm() / (PatchesForAllPointsWithinMask.get_column(i).two_norm() + 1e-10); 
+  }
+  cout << "Average percent error is " << PercentError.mean() * 100 << "%, with max of " << 
+    PercentError.max_value() * 100 << "%." <<  endl;
+  vnl_vector< InputPixelType > SampleReconstructedPatch = 
+    ReconstructedPatches.get_column(3); 
+  
+  InputImageType::Pointer ConvertedImage = InputImageType::New();
+
+  ConvertedImage = ConvertVectorToSpatialImage( 
+      SampleReconstructedPatch, MaskImage); 
   return 0;   
 }
