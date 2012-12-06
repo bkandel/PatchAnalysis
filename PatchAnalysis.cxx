@@ -33,9 +33,9 @@ int main(int argc, char * argv[] )
   double TargetPercentVarianceExplained = 0.95; 
 
   typedef itk::Image< InputPixelType, Dimension >   InputImageType;
-  InputImageType::Pointer InputImage = InputImageType::New();
-  InputImageType::Pointer MaskImage  = InputImageType::New();  
-  InputImageType::Pointer PatchImage = InputImageType::New(); 
+  InputImageType::Pointer InputImage;
+  InputImageType::Pointer MaskImage;  
+  InputImageType::Pointer PatchImage; 
 
   typedef itk::ImageFileReader< InputImageType > ReaderType;
   ReaderType::Pointer  inputImageReader = ReaderType::New();
@@ -105,7 +105,7 @@ int main(int argc, char * argv[] )
   radius.Fill( SizeOfPatches );
   IteratorType Iterator( radius, inputImageReader->GetOutput(),
                            inputImageReader->GetOutput()->GetRequestedRegion() );
-  typedef typename InputImageType::IndexType IndexType;
+  typedef InputImageType::IndexType IndexType;
   IndexType PatchCenterIndex;
   PatchCenterIndex.Fill( SizeOfPatches );
   Iterator.SetLocation( PatchCenterIndex );
@@ -272,9 +272,8 @@ int main(int argc, char * argv[] )
   vnl_vector< InputPixelType > SampleReconstructedPatch = 
     ReconstructedPatches.get_column(3); 
   
-  InputImageType::Pointer ConvertedImage = InputImageType::New();
-
-  ConvertedImage = ConvertVectorToSpatialImage( 
+  InputImageType::Pointer ConvertedImage;
+  ConvertedImage = ConvertVectorToSpatialImage<InputImageType,InputImageType,double>( 
       SampleReconstructedPatch, MaskImage); 
   return 0;   
 }

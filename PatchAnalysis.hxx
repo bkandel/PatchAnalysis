@@ -85,4 +85,5 @@ typename InputImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< InputP
       MaskIterator.Set( 0 ); 
     }
   }
+  return VectorAsSpatialImage;
 };
