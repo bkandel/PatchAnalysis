@@ -20,17 +20,15 @@ using namespace std;
 
 int main(int argc, char * argv[] )
 {
-  if( argc < 5) 
+  if( argc < 6) 
   {
     cout << "Usage: " << argv[0] << 
-       " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename " << endl; 
+       " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename SizeOfPatches" << endl; 
     return 1; 
   }
   typedef double       InputPixelType; 
   const unsigned int  Dimension = 2; // assume 2d images 
   const unsigned int  NumberOfPatches = 1000; 
-  const unsigned int  SizeOfPatches = 3;
-  const unsigned int  VolumeOfPatches = 49; //343; // illegal: pow(SizeOfPatches, Dimension);  
   double TargetPercentVarianceExplained = 0.95; 
 
   typedef itk::Image< InputPixelType, Dimension >   InputImageType;
@@ -41,16 +39,18 @@ int main(int argc, char * argv[] )
   typedef itk::ImageFileReader< InputImageType > ReaderType;
   ReaderType::Pointer  inputImageReader = ReaderType::New();
   ReaderType::Pointer  maskImageReader  = ReaderType::New(); 
-  typedef itk::CSVNumericObjectFileWriter< InputPixelType, 
+/*  typedef itk::CSVNumericObjectFileWriter< InputPixelType, 
                          NumberOfPatches, VolumeOfPatches > WriterType; 
   WriterType::Pointer patchWriter = WriterType::New(); 
   WriterType::Pointer eigvecWriter = WriterType::New(); 
-
+*/
 
   const char * inputFilename = argv[1];
   const char * maskFilename  = argv[2]; 
   const char * outputFilename = argv[3];
   const char * eigvecFilename = argv[4]; 
+  const unsigned int  SizeOfPatches = atoi(argv[ 5 ]);
+  const  unsigned int  VolumeOfPatches = pow(SizeOfPatches, Dimension); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
   inputImageReader->SetFileName( inputFilename );
   inputImageReader->Update();
   maskImageReader->SetFileName( maskFilename ); 
@@ -178,6 +178,7 @@ int main(int argc, char * argv[] )
   cout << "SignificantPatchEigenvectors is " << SignificantPatchEigenvectors.rows() << 
     "x" << SignificantPatchEigenvectors.columns() << "." << endl;
   
+  /*
   patchWriter->SetFileName( outputFilename ); 
   patchWriter->SetInput( &VectorizedPatchMatrix ); 
   patchWriter->Update(); 
@@ -188,7 +189,7 @@ int main(int argc, char * argv[] )
   eigvecWriter->SetFileName( SignificantEigvecFilename ); 
   eigvecWriter->SetInput( &SignificantPatchEigenvectors ); 
   eigvecWriter->Update();
-  
+  */
   // find total number of non-zero points in mask and store indices
   // WARNING: ASSUMES MASK IS BINARY!!
   typedef itk::StatisticsImageFilter< InputImageType > StatisticsFilterType; 
@@ -258,9 +259,11 @@ int main(int argc, char * argv[] )
     x = RegressionSVD.solve(PatchOfInterest); 
     EigenvectorCoefficients.set_column(i, x);
   }
+  /*
   patchWriter->SetFileName( "eigenvectorCoefficients.csv" );
   patchWriter->SetInput( &EigenvectorCoefficients );
   patchWriter->Update();
+  */
   vnl_matrix< InputPixelType > ReconstructedPatches = SignificantPatchEigenvectors * EigenvectorCoefficients; 
   vnl_matrix< InputPixelType > Error = ReconstructedPatches - PatchesForAllPointsWithinMask;
   vnl_vector< InputPixelType > PercentError(Error.columns() ); 
