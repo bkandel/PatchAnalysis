@@ -1,7 +1,8 @@
-#include<iostream>
-#include<stdio.h>
-#include<stdlib.h>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
+#include <sstream>
 #include "itkImage.h"
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
@@ -269,11 +270,28 @@ int main(int argc, char * argv[] )
   }
   cout << "Average percent error is " << PercentError.mean() * 100 << "%, with max of " << 
     PercentError.max_value() * 100 << "%." <<  endl;
-  vnl_vector< InputPixelType > SampleReconstructedPatch = 
-    ReconstructedPatches.get_column(3); 
+  cout << "EigenvectorCoefficients is " << EigenvectorCoefficients.rows() << "x" << 
+    EigenvectorCoefficients.columns() << "." << endl;
   
   InputImageType::Pointer ConvertedImage;
-  ConvertedImage = ConvertVectorToSpatialImage<InputImageType,InputImageType,double>( 
-      SampleReconstructedPatch, MaskImage); 
+  for( int i = 0; i < EigenvectorCoefficients.rows(); ++i) 
+  {
+    vnl_vector< InputPixelType > RegressionCoefficient = 
+      EigenvectorCoefficients.get_row(i); 
+    ConvertedImage = ConvertVectorToSpatialImage<InputImageType,InputImageType,double>( 
+      RegressionCoefficient, MaskImage);
+    typedef itk::ImageFileWriter< InputImageType > ImageWriterType;
+    ImageWriterType::Pointer  CoefficientImageWriter = ImageWriterType::New();
+    CoefficientImageWriter->SetInput( ConvertedImage ); 
+    string ImageIndex; 
+    ostringstream convert; 
+    convert << i; 
+    ImageIndex = convert.str(); 
+    string CoefficientImageFileName = "coeffs_out_" + ImageIndex + ".nii.gz"; 
+    CoefficientImageWriter->SetFileName( CoefficientImageFileName ); 
+    CoefficientImageWriter->Update(); 
+  }
+
+  
   return 0;   
 }
