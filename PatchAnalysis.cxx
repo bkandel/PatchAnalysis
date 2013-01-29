@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iterator>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -20,16 +21,15 @@ using namespace std;
 
 int main(int argc, char * argv[] )
 {
-  if( argc < 6) 
+  if( argc < 7) 
   {
     cout << "Usage: " << argv[0] << 
-       " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename SizeOfPatches" << endl; 
+       " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename SizeOfPatches TargetVarianceExplained" << endl; 
     return 1; 
   }
   typedef double       InputPixelType; 
   const unsigned int  Dimension = 2; // assume 2d images 
   const unsigned int  NumberOfPatches = 1000; 
-  double TargetPercentVarianceExplained = 0.95; 
 
   typedef itk::Image< InputPixelType, Dimension >   InputImageType;
   InputImageType::Pointer InputImage;
@@ -50,7 +50,8 @@ int main(int argc, char * argv[] )
   const char * outputFilename = argv[3];
   const char * eigvecFilename = argv[4]; 
   const unsigned int  SizeOfPatches = atoi(argv[ 5 ]);
-  const  unsigned int  VolumeOfPatches = pow(SizeOfPatches, Dimension); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
+  const unsigned int  VolumeOfPatches = pow(SizeOfPatches, Dimension); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
+  double TargetPercentVarianceExplained = atof( argv[ 6 ] ); 
   inputImageReader->SetFileName( inputFilename );
   inputImageReader->Update();
   maskImageReader->SetFileName( maskFilename ); 
@@ -110,6 +111,7 @@ int main(int argc, char * argv[] )
   IndexType PatchCenterIndex;
   PatchCenterIndex.Fill( SizeOfPatches );
   Iterator.SetLocation( PatchCenterIndex );
+
   // get indices within N-d sphere
   vector< unsigned int > IndicesWithinSphere;
   for( int ii = 0; ii < Iterator.Size(); ++ii)
@@ -130,6 +132,9 @@ int main(int argc, char * argv[] )
   }
   cout << Iterator.Size() << endl;
   cout << IndicesWithinSphere.size() << endl;
+  ostream_iterator< unsigned int > out_it( cout, " " ); 
+  copy( IndicesWithinSphere.begin(), IndicesWithinSphere.end(), out_it ); 
+//  cout << IndicesWithinSphere << endl;
 
   // populate matrix with patch values from points in image
   vnl_matrix< InputPixelType > VectorizedPatchMatrix( NumberOfPatches, IndicesWithinSphere.size() ); 
@@ -144,7 +149,7 @@ int main(int argc, char * argv[] )
     // get indices within N-d sphere
     for( int j = 0; j < IndicesWithinSphere.size(); ++j)
     {
-      VectorizedPatchMatrix( i, j ) = Iterator.GetPixel( j ); 
+      VectorizedPatchMatrix( i, j ) = Iterator.GetPixel( IndicesWithinSphere[ j ] );// BUG--should get indices that are included--eg IndicesWithinSphere[j] 
     }
   }
   cout << "VectorizedPatchMatrix is " << VectorizedPatchMatrix.rows() << 
@@ -230,7 +235,7 @@ int main(int argc, char * argv[] )
     // get indices within N-d sphere
     for( int j = 0; j < IndicesWithinSphere.size(); ++j)
     {
-      PatchesForAllPointsWithinMask( j, i ) = Iterator.GetPixel( j );
+      PatchesForAllPointsWithinMask( j, i ) = Iterator.GetPixel( IndicesWithinSphere[ j ] );
     }
   }
   cout << "Recorded patches for all points." << endl;
