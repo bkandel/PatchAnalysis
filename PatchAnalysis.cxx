@@ -45,12 +45,12 @@ int main(int argc, char * argv[] )
   WriterType::Pointer eigvecWriter = WriterType::New(); 
 */
 
-  const char * inputFilename = argv[1];
-  const char * maskFilename  = argv[2]; 
-  const char * outputFilename = argv[3];
-  const char * eigvecFilename = argv[4]; 
-  const unsigned int  SizeOfPatches = atoi(argv[ 5 ]);
-  const unsigned int  VolumeOfPatches = pow(SizeOfPatches, Dimension); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
+  const char * inputFilename            = argv[1];
+  const char * maskFilename             = argv[2]; 
+  const char * outputFilename           = argv[3];
+  const char * eigvecFilename           = argv[4]; 
+  const unsigned int  SizeOfPatches     = atoi(argv[ 5 ]);
+  const unsigned int  VolumeOfPatches   = pow(SizeOfPatches, Dimension); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
   double TargetPercentVarianceExplained = atof( argv[ 6 ] ); 
   inputImageReader->SetFileName( inputFilename );
   inputImageReader->Update();
@@ -132,8 +132,6 @@ int main(int argc, char * argv[] )
   }
   cout << Iterator.Size() << endl;
   cout << IndicesWithinSphere.size() << endl;
-  ostream_iterator< unsigned int > out_it( cout, " " ); 
-  copy( IndicesWithinSphere.begin(), IndicesWithinSphere.end(), out_it ); 
 //  cout << IndicesWithinSphere << endl;
 
   // populate matrix with patch values from points in image
@@ -149,7 +147,7 @@ int main(int argc, char * argv[] )
     // get indices within N-d sphere
     for( int j = 0; j < IndicesWithinSphere.size(); ++j)
     {
-      VectorizedPatchMatrix( i, j ) = Iterator.GetPixel( IndicesWithinSphere[ j ] );// BUG--should get indices that are included--eg IndicesWithinSphere[j] 
+      VectorizedPatchMatrix( i, j ) = Iterator.GetPixel( IndicesWithinSphere[ j ] );
     }
   }
   cout << "VectorizedPatchMatrix is " << VectorizedPatchMatrix.rows() << 
@@ -239,6 +237,28 @@ int main(int argc, char * argv[] )
     }
   }
   cout << "Recorded patches for all points." << endl;
+
+
+
+  /* Write out sample patch and see how rotation changes it. */
+
+  InputImageType::Pointer RotatedImage;
+//  RotatedImage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   // perform regression from eigenvectors to images
   // Ax = b, where A is eigenvector matrix (number of indices
