@@ -16,7 +16,7 @@
 #include <itkStatisticsImageFilter.h>
 #include "itkImageRegionIterator.h"
 #include "PatchAnalysis.hxx"
-
+#include "itkLinearInterpolateImageFunction.h"
 using namespace std; 
 
 int main(int argc, char * argv[] )
@@ -245,6 +245,10 @@ int main(int argc, char * argv[] )
   InputImageType::Pointer RotatedImage;
 //  RotatedImage
 
+  typedef itk::LinearInterpolateImageFunction<InputImageType,float> ScalarInterpolatorType;
+  typedef typename ScalarInterpolatorType::Pointer InterpPointer;
+  InterpPointer interp1 =  ScalarInterpolatorType::New();
+  InterpPointer interp2 =  ScalarInterpolatorType::New();
 
 
 

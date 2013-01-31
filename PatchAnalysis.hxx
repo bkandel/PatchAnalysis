@@ -3,10 +3,25 @@
 #include<stdlib.h>
 #include "vnl/vnl_matrix.h"
 #include "vnl/vnl_vector.h"
-#include "vnl/algo/vnl_conjugate_gradient.h"
-#include "vnl/vnl_cost_function.h"
-#include "vnl/algo/vnl_amoeba.h"
-#include "vnl/algo/vnl_lbfgs.h"
+#include <vnl/algo/vnl_symmetric_eigensystem.h>
+
+template <class TImage>
+bool IsInside( typename TImage::Pointer input, typename TImage::IndexType index )
+{
+  /** FIXME - should use StartIndex - */
+  typedef TImage ImageType;
+  enum { ImageDimension = ImageType::ImageDimension };
+  bool isinside = true;
+  for( unsigned int i = 0; i < ImageDimension; i++ )
+    {
+    float shifted = index[i];
+    if( shifted < 0 || shifted >  input->GetLargestPossibleRegion().GetSize()[i] - 1  )
+      {
+      isinside = false;
+      }
+    }
+  return isinside;
+}
 
 
 template< class InputImageType, class InputImage, class InputPixelType >
@@ -48,3 +63,145 @@ typename InputImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< InputP
   }
   return VectorAsSpatialImage;
 };
+
+template< unsigned int ImageDimension, class TRealType, class TImageType, 
+  class TGradientImageType, class TInterpolator > 
+  double PatchCorrelation( 
+      itk::NeighborhoodIterator< TImageType > GradientImageNeighborhood1, 
+      itk::NeighborhoodIterator< TImageType > GradientImageNeighborhood2, 
+      std::vector< unsigned int > IndicesWithinSphere, 
+      std::vector< TRealType > IndexWeights, 
+      typename TGradientImageType::Pointer GradientImage1, 
+      typename TGradientImageType::Pointer GradientImage2, 
+      TInterpolator Interpolator )
+{
+  typedef TRealType RealType; 
+  typedef typename TImageType::PointType PointType; 
+  typedef itk::CovariantVector< RealType, ImageDimension > GradientPixelType; 
+  typedef vnl_vector< RealType > VectorType; 
+  typedef typename TImageType::IndexType IndexType; 
+  unsigned int NumberOfIndicesWithinSphere = IndicesWithinSphere.size();
+  std::vector< PointType > ImagePatch1; 
+  std::vector< PointType > ImagePatch2; 
+  VectorType VectorizedImagePatch1( NumberOfIndicesWithinSphere, 0 ); 
+  VectorType VectorizedImagePatch2( NumberOfIndicesWithinSphere, 0 ); 
+  vnl_matrix< RealType > GradientMatrix1( NumberOfIndicesWithinSphere, ImageDimension ); 
+  vnl_matrix< RealType > GradientMatrix2( NumberOfIndicesWithinSphere, ImageDimension ); 
+  GradientMatrix1.fill( 0 ); 
+  GradientMatrix2.fill( 0 ); 
+  
+  /*  Calculate center of each image patch so that rotations are about the origin. */
+  PointType CenterPointOfImage1; 
+  PointType CenterPointOfImage2; 
+  CenterPointOfImage1.Fill( 0 ); 
+  CenterPointOfImage2.Fill( 0 ); 
+  RealType MeanNormalizingConstant = 1.0 / ( RealType ) NumberOfIndicesWithinSphere; 
+  for( unsigned int ii = 0; ii < NumberOfIndicesWithinSphere; ii++ ) 
+  {
+    VectorizedImagePatch1[ ii ] = GradientImageNeighborhood1.GetPixel( IndicesWithinSphere[ ii ] );
+    VectorizedImagePatch2[ ii ] = GradientImageNeighborhood2.GetPixel( IndicesWithinSphere[ ii ] ); 
+    IndexType GradientImageIndex1 = GradientImageNeighborhood1.GetIndex( IndicesWithinSphere[ ii ] ); 
+    IndexType GradientImageIndex2 = GradientImageNeighborhood2.GetIndex( IndicesWithinSphere[ ii ] ); 
+    if( ( IsInside< TGradientImageType >( GradientImage1, GradientImageIndex1) ) && 
+	( IsInside< TGradientImageType >( GradientImage2, GradientImageIndex2 ) ) )
+    {
+      GradientPixelType GradientPixel1 = GradientImage1->GetPixel( GradientImageIndex1 ) * IndexWeights[ ii ]; 
+      GradientPixelType GradientPixel2 = GradientImage2->GetPixel( GradientImageIndex2 ) * IndexWeights[ ii ]; 
+      for( unsigned int jj = 0; jj < ImageDimension; jj++)
+      {
+	GradientMatrix1( ii, jj ) = GradientPixel1[ jj ];
+	GradientMatrix2( ii, jj ) = GradientPixel2[ jj ];
+      }
+      PointType Point1; 
+      PointType Point2; 
+      GradientImage1->TransformIndexToPhysicalPoint( GradientImageIndex1, Point1 ); 
+      GradientImage2->TransformIndexToPhysicalPoint( GradientImageIndex2, Point2 ); 
+      for( unsigned int dd = 0; dd < ImageDimension; dd++ )
+      {
+	CenterPointOfImage1[ dd ] = CenterPointOfImage1[ dd ] + Point1[ dd ] * MeanNormalizingConstant; 
+	CenterPointOfImage2[ dd ] = CenterPointOfImage2[ dd ] + Point2[ dd ] * MeanNormalizingConstant; 
+      }
+      VectorizedImagePatch1.push_back( Point1 ); 
+      VectorizedImagePatch2.push_back( Point2 ); 
+    }
+    else return 0; 
+  }
+  RealType MeanOfImagePatch1 = VectorizedImagePatch1.mean(); 
+  RealType MeanOfImagePatch2 = VectorizedImagePatch2.mean(); 
+  VectorType CenteredVectorizedImagePatch1 = ( VectorizedImagePatch1 - MeanOfImagePatch1 ); 
+  VectorType CenteredVectorizedImagePatch2 = ( VectorizedImagePatch2 - MeanOfImagePatch2 ); 
+  RealType StDevOfImage1 = sqrt( CenteredVectorizedImagePatch1 - MeanOfImagePatch1 ); 
+  RealType StDevOfImage2 = sqrt( CenteredVectorizedImagePatch2 - MeanOfImagePatch2 ); 
+  RealType correlation = inner_product( CenteredVectorizedImagePatch1, 
+      CenteredVectorizedImagePatch2 ) / ( StDevOfImage1 * StDevOfImage2 );
+
+  bool OK = true; 
+  
+  vnl_matrix< RealType > CovarianceMatrixOfImage1 = GradientMatrix1.transpose() * GradientMatrix1; 
+  vnl_matrix< RealType > CovarianceMatrixOfImage2 = GradientMatrix2.transpose() * GradientMatrix2; 
+  vnl_symmetric_eigensystem< RealType > EigOfImage1( CovarianceMatrixOfImage1 ); 
+  vnl_symmetric_eigensystem< RealType > EigOfImage2( CovarianceMatrixOfImage2 ); 
+
+  int NumberOfEigenvectors = EigOfImage1.D.cols(); 
+  // FIXME: needs bug checking to make sure this is right
+  // not sure how many eigenvectors there are or how they're indexed
+  vnl_vector< RealType > Image1Eigvec1 = EigOfImage1.get_eigenvector( NumberOfEigenvectors - 1 ); // 0-indexed
+  vnl_vector< RealType > Image1Eigvec2 = EigOfImage1.get_eigenvector( NumberOfEigenvectors - 2 ); 
+  vnl_vector< RealType > Image2Eigvec1 = EigOfImage2.get_eigenvector( NumberOfEigenvectors - 1 ); 
+  vnl_vector< RealType > Image2Eigvec2 = EigOfImage2.get_eigenvector( NumberOfEigenvectors - 2 ); 
+
+  /* Solve Wahba's problem using Kabsch algorithm: 
+   * arg_min(Q) \sum_k || w_k - Q v_k ||^2
+   * Q is rotation matrix, w_k and v_k are vectors to be aligned.
+   * Solution:  Denote B = \sum_k w_k v_k^T
+   * Decompose B = U * S * V^T 
+   * Then Q = U * M * V^T, where M = diag[ 1 1 det(U) det(V) ] 
+   * Refs: http://journals.iucr.org/a/issues/1976/05/00/a12999/a12999.pdf 
+   *       http://www.control.auc.dk/~tb/best/aug23-Bak-svdalg.pdf */
+  vnl_matrix< RealType > B = outer_product( Image1Eigvec1, Image2Eigvec1 ); 
+  if( ImageDimension == 3)
+  {
+    B = outer_product( Image1Eigvec1, Image2Eigvec1 ) + 
+        outer_product( Image1Eigvec2, Image2Eigvec2 ); 
+  }
+  vnl_svd< RealType > WahbaSVD( B ); 
+  vnl_matrix< RealType > Q_solution = WahbaSVD.V() * WahbaSVD.U().transpose(); 
+  // Now rotate the points to the same frame and sample neighborhoods again.
+  for( unsigned int ii = 0; ii < NumberOfIndicesWithinSphere; ii++ )
+  {
+    PointType RotatedPoint = ImagePatch2[ ii ]; 
+    // We also need vector representation of the point values
+    vnl_vector< RealType > RotatedPointVector( RotatedPoint.Size(), 0 );
+    // First move center of Patch 1 to center of Patch 2
+    for( unsigned int dd = 0; dd < ImageDimension; dd++ )
+    {
+      RotatedPoint[ dd ] -= CenterPointOfImage2[ dd ]; 
+      RotatedPointVector[ dd ] = RotatedPoint[ dd ]; 
+    }
+    // Now rotate RotatedPoint
+    RotatedPointVector = ( Q_solution ) * RotatedPointVector; 
+    for( unsigned int dd = 0; dd < ImageDimension; dd++ )
+    {
+      RotatedPoint[ dd ] = RotatedPointVector + CenterPointOfImage2[ dd ];
+    }
+    if( Interpolator->IsInsideBuffer( RotatedPoint) )
+    {
+      VectorizedImagePatch2[ ii ] = Interpolator->Evaluate( RotatedPoint );
+    }
+    else OK = false; 
+  }
+  if( OK )
+  {
+    MeanOfImagePatch2 = VectorizedImagePatch2.mean(); 
+    CenteredVectorizedImagePatch2 = ( VectorizedImagePatch2 - MeanOfImagePatch2 ); 
+    StDevOfImage2 = sqrt( CenteredVectorizedImagePatch2.squared_magnitude() ); 
+    correlation = inner_product( VectorizedImagePatch1, VectorizedImagePatch2 ) / 
+      (StDevOfImage1 * StDevOfImage2 ); 
+  }
+  else correlation = 0; 
+
+  if ( vnl_math_isnan( correlation ) || vnl_math_isinf( correlation )  ) return 0; 
+  else return correlation;
+}
+
+
