@@ -4,6 +4,8 @@
 #include "vnl/vnl_matrix.h"
 #include "vnl/vnl_vector.h"
 #include <vnl/algo/vnl_symmetric_eigensystem.h>
+#include <itkImageRegionIterator.h>
+#include "itkNeighborhoodIterator.h"
 
 template <class TImage>
 bool IsInside( typename TImage::Pointer input, typename TImage::IndexType index )
@@ -21,6 +23,68 @@ bool IsInside( typename TImage::Pointer input, typename TImage::IndexType index 
       }
     }
   return isinside;
+}
+
+template< class InputImageType,  class InputPixelType > 
+typename InputImageType::Pointer GenerateMaskImageFromPatch( 
+    std::vector< unsigned int > &IndicesWithinSphere, 
+    const unsigned int &RadiusOfPatch, 
+    const unsigned int &Dimension ) 
+{
+  int NumberOfPaddingVoxels = 10;  
+  int SizeOfImage = 2 * RadiusOfPatch  + 2 *  NumberOfPaddingVoxels + 1; 
+  typename InputImageType::Pointer MaskImage = InputImageType::New( ); 
+  typename InputImageType::IndexType   start;
+  typename InputImageType::IndexType   BeginningOfSphereRegion; 
+  typename InputImageType::SizeType    SizeOfSphereRegion; 
+  typename InputImageType::SizeType    size;
+  typename InputImageType::SpacingType spacing; 
+  typename InputImageType::PointType   OriginPoint; 
+  typename InputImageType::IndexType   OriginIndex;
+
+  for( unsigned int dd = 0; dd < Dimension; dd++)
+  {
+    start[ dd ]   = 0; 
+    size[ dd ]    = SizeOfImage; 
+    spacing[ dd ] = 1.0; 
+    OriginPoint[ dd ] = OriginIndex[ dd ]  = 0.0; 
+    BeginningOfSphereRegion[ dd ] = NumberOfPaddingVoxels + 2; //0-indexed, so this should be right
+    SizeOfSphereRegion[ dd ] = RadiusOfPatch * 2 + 1; 
+  }
+
+  typename InputImageType::RegionType region; 
+  region.SetSize( size ); 
+  region.SetIndex( OriginIndex ); 
+  MaskImage->SetRegions( region ); 
+  MaskImage->Allocate( ); 
+  MaskImage->SetSpacing( spacing ); 
+  MaskImage->SetOrigin( OriginPoint );
+
+  typedef typename itk::ImageRegionIterator< InputImageType > RegionIteratorType; 
+  RegionIteratorType RegionIterator( MaskImage, region );
+  for ( RegionIterator.GoToBegin(); !RegionIterator.IsAtEnd(); ++RegionIterator)
+  {
+    RegionIterator.Set( 0.0 ); 
+  }
+
+
+  typename InputImageType::RegionType SphereRegion; 
+  SphereRegion.SetSize( SizeOfSphereRegion ); 
+  SphereRegion.SetIndex( BeginningOfSphereRegion ); 
+  typedef itk::NeighborhoodIterator< InputImageType > NeighborhoodIteratorType;
+  typename NeighborhoodIteratorType::RadiusType radius;
+  radius.Fill( RadiusOfPatch );
+  NeighborhoodIteratorType SphereRegionIterator( radius, MaskImage, SphereRegion ); 
+  
+  typename InputImageType::IndexType IndexWithinSphere; 
+  for( unsigned int ii = 0; ii < IndicesWithinSphere.size(); ii++) 
+  {
+    SphereRegionIterator.SetPixel( IndicesWithinSphere[ ii ],  1.0 );
+    std::cout << "Writing index " << ii << " which is " << IndicesWithinSphere[ ii ] << std::endl;
+  }
+
+  return MaskImage;
+
 }
 
 

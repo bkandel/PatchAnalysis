@@ -238,11 +238,9 @@ int main(int argc, char * argv[] )
   }
   cout << "Recorded patches for all points." << endl;
 
+  // Compute correlation 
 
 
-  /* Write out sample patch and see how rotation changes it. */
-
-  InputImageType::Pointer RotatedImage;
 //  RotatedImage
 
   typedef itk::LinearInterpolateImageFunction<InputImageType,float> ScalarInterpolatorType;
@@ -255,9 +253,16 @@ int main(int argc, char * argv[] )
 
 
 
+  typedef itk::ImageFileWriter< InputImageType > ImageWriterType;
 
 
-
+  InputImageType::Pointer EigvecMaskImage;
+  EigvecMaskImage = GenerateMaskImageFromPatch< InputImageType, InputPixelType >( 
+      IndicesWithinSphere, SizeOfPatches, Dimension);
+  ImageWriterType::Pointer EigvecMaskImageWriter = ImageWriterType::New(); 
+  EigvecMaskImageWriter->SetInput( EigvecMaskImage ); 
+  EigvecMaskImageWriter->SetFileName( "TestMask.nii.gz" ); 
+  EigvecMaskImageWriter->Update(); 
 
 
 
