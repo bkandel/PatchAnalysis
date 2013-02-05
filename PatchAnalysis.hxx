@@ -31,7 +31,7 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
     const unsigned int &RadiusOfPatch, 
     const unsigned int &Dimension ) 
 {
-  int NumberOfPaddingVoxels = 10;  
+  int NumberOfPaddingVoxels = 2;  
   int SizeOfImage = 2 * RadiusOfPatch  + 2 *  NumberOfPaddingVoxels + 1; 
   typename InputImageType::Pointer MaskImage = InputImageType::New( ); 
   typename InputImageType::IndexType   start;
@@ -48,7 +48,7 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
     size[ dd ]    = SizeOfImage; 
     spacing[ dd ] = 1.0; 
     OriginPoint[ dd ] = OriginIndex[ dd ]  = 0.0; 
-    BeginningOfSphereRegion[ dd ] = NumberOfPaddingVoxels + 2; //0-indexed, so this should be right
+    BeginningOfSphereRegion[ dd ] = NumberOfPaddingVoxels + 2; // one for each side--this is correct
     SizeOfSphereRegion[ dd ] = RadiusOfPatch * 2 + 1; 
   }
 

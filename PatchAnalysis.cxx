@@ -263,8 +263,25 @@ int main(int argc, char * argv[] )
   EigvecMaskImageWriter->SetInput( EigvecMaskImage ); 
   EigvecMaskImageWriter->SetFileName( "TestMask.nii.gz" ); 
   EigvecMaskImageWriter->Update(); 
+  
+  ImageWriterType::Pointer EigvecWriter = ImageWriterType::New(); 
+  // write out eigenvectors 
+  for ( unsigned int ii = 0; ii < NumberOfSignificantEigenvectors; ii++)
+  {
+    vnl_vector< InputPixelType > EigvecAsPixel =
+	        SignificantPatchEigenvectors.get_column( ii );
+    string ImageIndex;
+    ostringstream convert;
+    convert << ii;
+    ImageIndex = convert.str();
+    EigvecWriter->SetInput( ConvertVectorToSpatialImage< InputImageType, 
+	InputImageType, double >( EigvecAsPixel, 
+	  EigvecMaskImage) );
+    string EigvecFileName = "Eigvec" + ImageIndex + ".nii.gz" ; 
+    EigvecWriter->SetFileName(EigvecFileName);  
+    EigvecWriter->Update(); 
 
-
+  }
 
 
 
