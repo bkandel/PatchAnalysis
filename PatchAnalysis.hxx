@@ -48,7 +48,7 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
     size[ dd ]    = SizeOfImage; 
     spacing[ dd ] = 1.0; 
     OriginPoint[ dd ] = OriginIndex[ dd ]  = 0.0; 
-    BeginningOfSphereRegion[ dd ] = NumberOfPaddingVoxels + 2; // one for each side--this is correct
+    BeginningOfSphereRegion[ dd ] = NumberOfPaddingVoxels + RadiusOfPatch; // one for each side--this is correct
     SizeOfSphereRegion[ dd ] = RadiusOfPatch * 2 + 1; 
   }
 
@@ -127,6 +127,11 @@ typename InputImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< InputP
   }
   return VectorAsSpatialImage;
 };
+
+
+
+
+
 
 template< unsigned int ImageDimension, class TRealType, class TImageType, 
   class TGradientImageType, class TInterpolator > 

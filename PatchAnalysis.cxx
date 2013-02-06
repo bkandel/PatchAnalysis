@@ -39,11 +39,6 @@ int main(int argc, char * argv[] )
   typedef itk::ImageFileReader< InputImageType > ReaderType;
   ReaderType::Pointer  inputImageReader = ReaderType::New();
   ReaderType::Pointer  maskImageReader  = ReaderType::New(); 
-/*  typedef itk::CSVNumericObjectFileWriter< InputPixelType, 
-                         NumberOfPatches, VolumeOfPatches > WriterType; 
-  WriterType::Pointer patchWriter = WriterType::New(); 
-  WriterType::Pointer eigvecWriter = WriterType::New(); 
-*/
 
   const char * inputFilename            = argv[1];
   const char * maskFilename             = argv[2]; 
@@ -132,7 +127,6 @@ int main(int argc, char * argv[] )
   }
   cout << Iterator.Size() << endl;
   cout << IndicesWithinSphere.size() << endl;
-//  cout << IndicesWithinSphere << endl;
 
   // populate matrix with patch values from points in image
   vnl_matrix< InputPixelType > VectorizedPatchMatrix( NumberOfPatches, IndicesWithinSphere.size() ); 
@@ -181,18 +175,6 @@ int main(int argc, char * argv[] )
   cout << "SignificantPatchEigenvectors is " << SignificantPatchEigenvectors.rows() << 
     "x" << SignificantPatchEigenvectors.columns() << "." << endl;
   
-  /*
-  patchWriter->SetFileName( outputFilename ); 
-  patchWriter->SetInput( &VectorizedPatchMatrix ); 
-  patchWriter->Update(); 
-  eigvecWriter->SetFileName( eigvecFilename ); 
-  eigvecWriter->SetInput( &PatchEigenvectors); 
-  eigvecWriter->Update(); 
-
-  eigvecWriter->SetFileName( SignificantEigvecFilename ); 
-  eigvecWriter->SetInput( &SignificantPatchEigenvectors ); 
-  eigvecWriter->Update();
-  */
   // find total number of non-zero points in mask and store indices
   // WARNING: ASSUMES MASK IS BINARY!!
   typedef itk::StatisticsImageFilter< InputImageType > StatisticsFilterType; 
@@ -280,9 +262,40 @@ int main(int argc, char * argv[] )
     string EigvecFileName = "Eigvec" + ImageIndex + ".nii.gz" ; 
     EigvecWriter->SetFileName(EigvecFileName);  
     EigvecWriter->Update(); 
-
   }
 
+  // test rotation of eigenvectors 
+  int Fixed = 17; 
+  int Moving = 19; 
+  vnl_vector< InputPixelType > Rotated = Wahba(
+      SignificantPatchEigenvectors.get_column(Fixed), 
+      SignificantPatchEigenvectors.get_column(Moving)); 
+  InputImageType::Pointer FixedImage; 
+  InputImageType::Pointer MovingImage; 
+  InputImageType::Pointer RotatedImage;
+  ImageWriterType::Pointer RotationWriter = ImageWriterType::New(); 
+  
+  vnl_vector< InputPixelType > FixedVector = SignificantPatchEigenvectors.get_column(Fixed); 
+  vnl_vector< InputPixelType > MovingVector = SignificantPatchEigenvectors.get_column(Moving); 
+
+  FixedImage = ConvertVectorToSpatialImage< InputImageType, 
+	     InputImageType, double > ( FixedVector,
+		 EigvecMaskImage); 
+  MovingImage = ConvertVectorToSpatialImage< InputImageType, 
+	      InputImageType, double > ( MovingVector, 
+		  EigvecMaskImage); 
+  RotatedImage = ConvertVectorToSpatialImage< InputImageType, 
+	       InputImageType, double > (Rotated, EigvecMaskImage); 
+ 
+  RotationWriter->SetInput(FixedImage); 
+  RotationWriter->SetFileName("Fixed.nii.gz"); 
+  RotationWriter->Update(); 
+  RotationWriter->SetInput(MovingImage); 
+  RotationWriter->SetFileName("Moving.nii.gz"); 
+  RotationWriter->Update(); 
+  RotationWriter->SetInput(RotatedImage); 
+  RotationWriter->SetFileName("Rotated.nii.gz"); 
+  RotationWriter->Update(); 
 
 
 
@@ -302,19 +315,11 @@ int main(int argc, char * argv[] )
   {
     vnl_vector< InputPixelType > PatchOfInterest = 
       PatchesForAllPointsWithinMask.get_column(i);
-//    cout << "PatchOfInterest: " << PatchOfInterest << endl; 
     vnl_vector< InputPixelType > x( NumberOfSignificantEigenvectors ); 
     x.fill( 0 );
-//    if(i % 100000 == 0) cout << "Computed " << i << " out of " << SumOfMaskImage << "regressions." << endl;
-    
     x = RegressionSVD.solve(PatchOfInterest); 
     EigenvectorCoefficients.set_column(i, x);
   }
-  /*
-  patchWriter->SetFileName( "eigenvectorCoefficients.csv" );
-  patchWriter->SetInput( &EigenvectorCoefficients );
-  patchWriter->Update();
-  */
   vnl_matrix< InputPixelType > ReconstructedPatches = SignificantPatchEigenvectors * EigenvectorCoefficients; 
   vnl_matrix< InputPixelType > Error = ReconstructedPatches - PatchesForAllPointsWithinMask;
   vnl_vector< InputPixelType > PercentError(Error.columns() ); 
