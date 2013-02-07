@@ -265,7 +265,7 @@ int main(int argc, char * argv[] )
   }
 
   // test rotation of eigenvectors 
-  int Fixed = 17; 
+ /* int Fixed = 17; 
   int Moving = 19; 
   vnl_vector< InputPixelType > Rotated = Wahba(
       SignificantPatchEigenvectors.get_column(Fixed), 
@@ -296,7 +296,7 @@ int main(int argc, char * argv[] )
   RotationWriter->SetInput(RotatedImage); 
   RotationWriter->SetFileName("Rotated.nii.gz"); 
   RotationWriter->Update(); 
-
+  */
 
 
   // perform regression from eigenvectors to images
