@@ -297,6 +297,57 @@ int main(int argc, char * argv[] )
   RotationWriter->SetFileName("Rotated.nii.gz"); 
   RotationWriter->Update(); 
   */
+  int FixedIndex = 17; 
+  int MovingIndex = 19;
+  int NumberOfPaddingVoxels = 2; 
+  int RadiusOfPatch = SizeOfPatches; 
+  typedef itk::NeighborhoodIterator< InputImageType > NeighborhoodIteratorType;
+  radius.Fill( RadiusOfPatch );
+  typename InputImageType::RegionType SphereRegion;
+  typename InputImageType::IndexType   BeginningOfSphereRegion;
+  typename InputImageType::SizeType    SizeOfSphereRegion;
+
+  for( unsigned int dd = 0; dd < Dimension; dd++)
+  {
+    BeginningOfSphereRegion[ dd ] = NumberOfPaddingVoxels + RadiusOfPatch; 
+    SizeOfSphereRegion[ dd ] = RadiusOfPatch * 2 + 1;
+  }
+
+  SphereRegion.SetSize( SizeOfSphereRegion );
+  SphereRegion.SetIndex( BeginningOfSphereRegion );
+  
+  NeighborhoodIteratorType RegionIterator( radius, EigvecMaskImage, SphereRegion );
+  InputImageType::Pointer FixedImage; 
+  InputImageType::Pointer MovingImage; 
+  InputImageType::Pointer RotatedImage;
+  ImageWriterType::Pointer RotationWriter = ImageWriterType::New(); 
+  
+  vnl_vector< InputPixelType > FixedVector = SignificantPatchEigenvectors.get_column(FixedIndex); 
+  vnl_vector< InputPixelType > MovingVector = SignificantPatchEigenvectors.get_column(MovingIndex); 
+
+
+  FixedImage = ConvertVectorToSpatialImage< InputImageType, 
+             InputImageType, double > ( FixedVector,
+                 EigvecMaskImage); 
+  MovingImage = ConvertVectorToSpatialImage< InputImageType, 
+              InputImageType, double > ( MovingVector, 
+                  EigvecMaskImage); 
+  InputImageType::Pointer ReorientedEigvec;
+  unsigned int NumberOfValuesPerVoxel = 1; 
+  ReorientedEigvec = 
+    ReorientPatchToReferenceFrame< Dimension, InputPixelType, InputImageType, 
+    InputImageType, InterpPointer > (
+	RegionIterator, 
+	RegionIterator, 
+	IndicesWithinSphere, 
+	IndicesWithinSphere, 
+	FixedImage, 
+	MovingImage, 
+	NumberOfValuesPerVoxel, 
+	interp1
+	);
+
+
 
 
   // perform regression from eigenvectors to images

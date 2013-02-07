@@ -33,7 +33,7 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
 {
   int NumberOfPaddingVoxels = 2;  
   int SizeOfImage = 2 * RadiusOfPatch  + 2 *  NumberOfPaddingVoxels + 1; 
-  typename InputImageType::Pointer MaskImage = InputImageType::New( ); 
+  typename InputImageType::Pointer MaskImage; 
   typename InputImageType::IndexType   start;
   typename InputImageType::IndexType   BeginningOfSphereRegion; 
   typename InputImageType::SizeType    SizeOfSphereRegion; 
