@@ -33,7 +33,7 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
 {
   int NumberOfPaddingVoxels = 2;  
   int SizeOfImage = 2 * RadiusOfPatch  + 2 *  NumberOfPaddingVoxels + 1; 
-  typename InputImageType::Pointer MaskImage; 
+  typename InputImageType::Pointer MaskImage = InputImageType::New(); 
   typename InputImageType::IndexType   start;
   typename InputImageType::IndexType   BeginningOfSphereRegion; 
   typename InputImageType::SizeType    SizeOfSphereRegion; 
@@ -51,7 +51,6 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
     BeginningOfSphereRegion[ dd ] = NumberOfPaddingVoxels + RadiusOfPatch; // one for each side--this is correct
     SizeOfSphereRegion[ dd ] = RadiusOfPatch * 2 + 1; 
   }
-
   typename InputImageType::RegionType region; 
   region.SetSize( size ); 
   region.SetIndex( OriginIndex ); 
@@ -59,7 +58,6 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
   MaskImage->Allocate( ); 
   MaskImage->SetSpacing( spacing ); 
   MaskImage->SetOrigin( OriginPoint );
-
   typedef typename itk::ImageRegionIterator< InputImageType > RegionIteratorType; 
   RegionIteratorType RegionIterator( MaskImage, region );
   for ( RegionIterator.GoToBegin(); !RegionIterator.IsAtEnd(); ++RegionIterator)
@@ -132,11 +130,12 @@ template< unsigned int ImageDimension, class TRealType, class TImageType,
   class TGradientImageType, class TInterpolator > 
 typename TImageType::Pointer ReorientPatchToReferenceFrame( 
     itk::NeighborhoodIterator< TImageType > GradientImageNeighborhood1, 
-    itk::NeighborhoodIterator< TImageType > GradientImageNeighborhood2, 
+    itk::NeighborhoodIterator< TImageType > GradientImageNeighborhood2,
+    const typename TImageType::Pointer MaskImage, 
     std::vector< unsigned int > IndicesWithinSphere, 
-    std::vector< TRealType > IndexWeights, 
-    typename TGradientImageType::Pointer GradientImage1, 
-    typename TGradientImageType::Pointer GradientImage2,
+    std::vector< double > IndexWeights, 
+    const typename TGradientImageType::Pointer GradientImage1, 
+    const typename TGradientImageType::Pointer GradientImage2,
     unsigned int NumberOfValuesPerVoxel,
     TInterpolator Interpolator 
     )
@@ -160,8 +159,8 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
   std::vector< PointType > ImagePatch2; 
   VectorType VectorizedImagePatch1( NumberOfIndicesWithinSphere, 0 ); 
   VectorType VectorizedImagePatch2( NumberOfIndicesWithinSphere, 0 ); 
-  vnl_matrix< RealType > GradientMatrix1( NumberOfIndicesWithinSphere, ImageDimension ); 
-  vnl_matrix< RealType > GradientMatrix2( NumberOfIndicesWithinSphere, ImageDimension ); 
+  vnl_matrix< RealType > GradientMatrix1( NumberOfIndicesWithinSphere, NumberOfValuesPerVoxel ); 
+  vnl_matrix< RealType > GradientMatrix2( NumberOfIndicesWithinSphere, NumberOfValuesPerVoxel ); 
   GradientMatrix1.fill( 0 ); 
   GradientMatrix2.fill( 0 ); 
   
@@ -196,8 +195,8 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
 	CenterPointOfImage1[ dd ] = CenterPointOfImage1[ dd ] + Point1[ dd ] * MeanNormalizingConstant; 
 	CenterPointOfImage2[ dd ] = CenterPointOfImage2[ dd ] + Point2[ dd ] * MeanNormalizingConstant; 
       }
-      VectorizedImagePatch1.push_back( Point1 ); 
-      VectorizedImagePatch2.push_back( Point2 ); 
+      ImagePatch1.push_back( Point1 ); 
+      ImagePatch2.push_back( Point2 ); 
     }
     else return 0; 
   }
@@ -205,18 +204,21 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
   RealType MeanOfImagePatch2 = VectorizedImagePatch2.mean(); 
   VectorType CenteredVectorizedImagePatch1 = ( VectorizedImagePatch1 - MeanOfImagePatch1 ); 
   VectorType CenteredVectorizedImagePatch2 = ( VectorizedImagePatch2 - MeanOfImagePatch2 ); 
-  RealType StDevOfImage1 = sqrt( CenteredVectorizedImagePatch1 - MeanOfImagePatch1 ); 
-  RealType StDevOfImage2 = sqrt( CenteredVectorizedImagePatch2 - MeanOfImagePatch2 ); 
+  RealType StDevOfImage1 = sqrt( CenteredVectorizedImagePatch1.squared_magnitude()  ); 
+  RealType StDevOfImage2 = sqrt( CenteredVectorizedImagePatch2.squared_magnitude() ); 
   RealType correlation = inner_product( CenteredVectorizedImagePatch1, 
       CenteredVectorizedImagePatch2 ) / ( StDevOfImage1 * StDevOfImage2 );
 
-  bool OK = true; 
-  
+  bool OK = true;
+  std::cout << "VectorizedImagePatch1 is (before rotation) " << VectorizedImagePatch1 << std::endl;
+  std::cout << "VectorizedImagePatch2 is (before rotation) " << VectorizedImagePatch2 << std::endl;
+  std::cout << "GradientMatrix1 is " << GradientMatrix1 << std::endl; 
+  std::cout << "GradientMatrix2 is " << GradientMatrix2 << std::endl;
   vnl_matrix< RealType > CovarianceMatrixOfImage1 = GradientMatrix1.transpose() * GradientMatrix1; 
   vnl_matrix< RealType > CovarianceMatrixOfImage2 = GradientMatrix2.transpose() * GradientMatrix2; 
   vnl_symmetric_eigensystem< RealType > EigOfImage1( CovarianceMatrixOfImage1 ); 
   vnl_symmetric_eigensystem< RealType > EigOfImage2( CovarianceMatrixOfImage2 ); 
-
+  std::cout << CovarianceMatrixOfImage2 << std::endl;
   int NumberOfEigenvectors = EigOfImage1.D.cols(); 
   // FIXME: needs bug checking to make sure this is right
   // not sure how many eigenvectors there are or how they're indexed
@@ -233,14 +235,20 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
    * Then Q = U * M * V^T, where M = diag[ 1 1 det(U) det(V) ] 
    * Refs: http://journals.iucr.org/a/issues/1976/05/00/a12999/a12999.pdf 
    *       http://www.control.auc.dk/~tb/best/aug23-Bak-svdalg.pdf */
-  vnl_matrix< RealType > B = outer_product( Image1Eigvec1, Image2Eigvec1 ); 
+  vnl_matrix< RealType > B = outer_product( Image1Eigvec1, Image2Eigvec1 );
+  std::cout << "Image1Eigvec1 is " <<  Image1Eigvec1 << std::endl;
+  std::cout << "Image1Eigvec2 " << Image1Eigvec2 << std::endl;
+  std::cout << "Image2Eigvec1 is " << Image2Eigvec1 << std::endl;
+  std::cout << "Image2Eigvec2 is " << Image2Eigvec2 << std::endl;
   if( ImageDimension == 3)
   {
     B = outer_product( Image1Eigvec1, Image2Eigvec1 ) + 
         outer_product( Image1Eigvec2, Image2Eigvec2 ); 
   }
-  vnl_svd< RealType > WahbaSVD( B ); 
-  vnl_matrix< RealType > Q_solution = WahbaSVD.V() * WahbaSVD.U().transpose(); 
+  vnl_svd< RealType > WahbaSVD( B );
+  std::cout << B << std::endl;
+  vnl_matrix< RealType > Q_solution = WahbaSVD.V() * WahbaSVD.U().transpose();
+  std::cout << Q_solution << std::endl;
   // Now rotate the points to the same frame and sample neighborhoods again.
   for( unsigned int ii = 0; ii < NumberOfIndicesWithinSphere; ii++ )
   {
@@ -257,27 +265,30 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
     RotatedPointVector = ( Q_solution ) * RotatedPointVector; 
     for( unsigned int dd = 0; dd < ImageDimension; dd++ )
     {
-      RotatedPoint[ dd ] = RotatedPointVector + CenterPointOfImage2[ dd ];
-    }
+      RotatedPoint[ dd ] = RotatedPointVector[ dd ] + CenterPointOfImage2[ dd ];
+    } 
+//    std::cout << "Original Point is " << ImagePatch2[ii] << ", Reoriented is " << RotatedPoint << std::endl;
     if( Interpolator->IsInsideBuffer( RotatedPoint) )
     {
       VectorizedImagePatch2[ ii ] = Interpolator->Evaluate( RotatedPoint );
     }
     else OK = false; 
   }
-
+  std::cout << "VectorizedImagePatch2 is " <<  VectorizedImagePatch2 << std::endl;
   // Generate image to return
-  typename  TImageType::Pointer ReorientedImage = GradientImage1; 
-  typedef itk::NeighborhoodIterator< TImageType > NeighborhoodIteratorType;
+  typename  TImageType::Pointer ReorientedImage = TImageType::New();
+  ReorientedImage = ConvertVectorToSpatialImage<TImageType, 
+		  TImageType, double > (VectorizedImagePatch2, MaskImage); 
+  /*typedef itk::NeighborhoodIterator< TImageType > NeighborhoodIteratorType;
   NeighborhoodIteratorType ReorientedRegionIterator( 
-      GradientImageNeighborhood1.GetRadius(), GradientImage1, 
+      GradientImageNeighborhood1.GetRadius(), ReorientedImage, //GradientImage1, 
       GradientImageNeighborhood1.GetBoundingBoxAsImageRegion()); 
 
   for( unsigned int ii = 0; ii < IndicesWithinSphere.size(); ii++)
   {
     ReorientedRegionIterator.SetPixel( IndicesWithinSphere[ ii ],  
 	VectorizedImagePatch2[ ii ] );
-  }
+  }*/
 
   return ReorientedImage; 
 }

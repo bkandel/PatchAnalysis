@@ -17,6 +17,9 @@
 #include "itkImageRegionIterator.h"
 #include "PatchAnalysis.hxx"
 #include "itkLinearInterpolateImageFunction.h"
+#include "itkGradientImageFilter.h"
+#include "itkCovariantVector.h"
+#include "itkGradientRecursiveGaussianImageFilter.h"
 using namespace std; 
 
 int main(int argc, char * argv[] )
@@ -28,6 +31,7 @@ int main(int argc, char * argv[] )
     return 1; 
   }
   typedef double       InputPixelType; 
+  typedef double       RealType; 
   const unsigned int  Dimension = 2; // assume 2d images 
   const unsigned int  NumberOfPatches = 1000; 
 
@@ -109,6 +113,7 @@ int main(int argc, char * argv[] )
 
   // get indices within N-d sphere
   vector< unsigned int > IndicesWithinSphere;
+  vector< double > Weights; 
   for( int ii = 0; ii < Iterator.Size(); ++ii)
   {
     IndexType Index = Iterator.GetIndex( ii );
@@ -123,6 +128,7 @@ int main(int argc, char * argv[] )
     if( DistanceFromPatchCenter <= SizeOfPatches )
     {
       IndicesWithinSphere.push_back( ii );
+      Weights.push_back( 1.0 ); 
     }
   }
   cout << Iterator.Size() << endl;
@@ -234,7 +240,6 @@ int main(int argc, char * argv[] )
 
 
 
-
   typedef itk::ImageFileWriter< InputImageType > ImageWriterType;
 
 
@@ -245,7 +250,6 @@ int main(int argc, char * argv[] )
   EigvecMaskImageWriter->SetInput( EigvecMaskImage ); 
   EigvecMaskImageWriter->SetFileName( "TestMask.nii.gz" ); 
   EigvecMaskImageWriter->Update(); 
-  
   ImageWriterType::Pointer EigvecWriter = ImageWriterType::New(); 
   // write out eigenvectors 
   for ( unsigned int ii = 0; ii < NumberOfSignificantEigenvectors; ii++)
@@ -263,7 +267,6 @@ int main(int argc, char * argv[] )
     EigvecWriter->SetFileName(EigvecFileName);  
     EigvecWriter->Update(); 
   }
-
   // test rotation of eigenvectors 
  /* int Fixed = 17; 
   int Moving = 19; 
@@ -306,6 +309,11 @@ int main(int argc, char * argv[] )
   typename InputImageType::RegionType SphereRegion;
   typename InputImageType::IndexType   BeginningOfSphereRegion;
   typename InputImageType::SizeType    SizeOfSphereRegion;
+  typedef itk::CovariantVector<RealType, Dimension>                               GradientPixelType;
+  typedef itk::Image<GradientPixelType, Dimension>                                GradientImageType;
+  typedef itk::SmartPointer<GradientImageType>                                    GradientImagePointer;
+  typedef itk::GradientRecursiveGaussianImageFilter<InputImageType, GradientImageType> GradientImageFilterType;
+  typedef typename GradientImageFilterType::Pointer                               GradientImageFilterPointer;
 
   for( unsigned int dd = 0; dd < Dimension; dd++)
   {
@@ -321,32 +329,48 @@ int main(int argc, char * argv[] )
   InputImageType::Pointer MovingImage; 
   InputImageType::Pointer RotatedImage;
   ImageWriterType::Pointer RotationWriter = ImageWriterType::New(); 
-  
+  ImageWriterType::Pointer FixedWriter = ImageWriterType::New(); 
+  ImageWriterType::Pointer MovingWriter = ImageWriterType::New(); 
   vnl_vector< InputPixelType > FixedVector = SignificantPatchEigenvectors.get_column(FixedIndex); 
   vnl_vector< InputPixelType > MovingVector = SignificantPatchEigenvectors.get_column(MovingIndex); 
 
-
+  cout << "FixedVector is " << FixedVector << endl;
+  cout << "MovingVector is " << MovingVector << endl;
   FixedImage = ConvertVectorToSpatialImage< InputImageType, 
              InputImageType, double > ( FixedVector,
                  EigvecMaskImage); 
   MovingImage = ConvertVectorToSpatialImage< InputImageType, 
               InputImageType, double > ( MovingVector, 
-                  EigvecMaskImage); 
+                  EigvecMaskImage);
+  NeighborhoodIteratorType FixedIterator( radius, FixedImage, SphereRegion ); 
+  NeighborhoodIteratorType MovingIterator( radius, MovingImage, SphereRegion ); 
+  FixedWriter->SetInput(FixedImage); 
+  FixedWriter->SetFileName("Fixed.nii.gz"); 
+  FixedWriter->Update(); 
+  MovingWriter->SetInput(MovingImage); 
+  MovingWriter->SetFileName("Moving.nii.gz"); 
+  MovingWriter->Update(); 
   InputImageType::Pointer ReorientedEigvec;
-  unsigned int NumberOfValuesPerVoxel = 1; 
+  unsigned int NumberOfValuesPerVoxel = 1;
+  cout << "Weights are " << Weights.size() << endl;
+  interp1->SetInputImage( MovingImage ); //really?
   ReorientedEigvec = 
     ReorientPatchToReferenceFrame< Dimension, InputPixelType, InputImageType, 
     InputImageType, InterpPointer > (
-	RegionIterator, 
-	RegionIterator, 
+	FixedIterator, 
+	MovingIterator, 
+        EigvecMaskImage,
 	IndicesWithinSphere, 
-	IndicesWithinSphere, 
+	Weights,
 	FixedImage, 
 	MovingImage, 
 	NumberOfValuesPerVoxel, 
 	interp1
 	);
 
+  RotationWriter->SetInput(ReorientedEigvec); 
+  RotationWriter->SetFileName("Rotated.nii.gz"); 
+  RotationWriter->Update(); 
 
 
 
