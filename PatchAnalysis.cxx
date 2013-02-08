@@ -30,8 +30,8 @@ int main(int argc, char * argv[] )
        " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename SizeOfPatches TargetVarianceExplained" << endl; 
     return 1; 
   }
-  typedef double       InputPixelType; 
-  typedef double       RealType; 
+  typedef double      InputPixelType; 
+  typedef double      RealType; 
   const unsigned int  Dimension = 2; // assume 2d images 
   const unsigned int  NumberOfPatches = 1000; 
 
@@ -234,14 +234,9 @@ int main(int argc, char * argv[] )
   typedef itk::LinearInterpolateImageFunction<InputImageType,float> ScalarInterpolatorType;
   typedef typename ScalarInterpolatorType::Pointer InterpPointer;
   InterpPointer interp1 =  ScalarInterpolatorType::New();
-  InterpPointer interp2 =  ScalarInterpolatorType::New();
-
-
-
 
 
   typedef itk::ImageFileWriter< InputImageType > ImageWriterType;
-
 
   InputImageType::Pointer EigvecMaskImage;
   EigvecMaskImage = GenerateMaskImageFromPatch< InputImageType, InputPixelType >( 
@@ -268,38 +263,6 @@ int main(int argc, char * argv[] )
     EigvecWriter->Update(); 
   }
   // test rotation of eigenvectors 
- /* int Fixed = 17; 
-  int Moving = 19; 
-  vnl_vector< InputPixelType > Rotated = Wahba(
-      SignificantPatchEigenvectors.get_column(Fixed), 
-      SignificantPatchEigenvectors.get_column(Moving)); 
-  InputImageType::Pointer FixedImage; 
-  InputImageType::Pointer MovingImage; 
-  InputImageType::Pointer RotatedImage;
-  ImageWriterType::Pointer RotationWriter = ImageWriterType::New(); 
-  
-  vnl_vector< InputPixelType > FixedVector = SignificantPatchEigenvectors.get_column(Fixed); 
-  vnl_vector< InputPixelType > MovingVector = SignificantPatchEigenvectors.get_column(Moving); 
-
-  FixedImage = ConvertVectorToSpatialImage< InputImageType, 
-	     InputImageType, double > ( FixedVector,
-		 EigvecMaskImage); 
-  MovingImage = ConvertVectorToSpatialImage< InputImageType, 
-	      InputImageType, double > ( MovingVector, 
-		  EigvecMaskImage); 
-  RotatedImage = ConvertVectorToSpatialImage< InputImageType, 
-	       InputImageType, double > (Rotated, EigvecMaskImage); 
- 
-  RotationWriter->SetInput(FixedImage); 
-  RotationWriter->SetFileName("Fixed.nii.gz"); 
-  RotationWriter->Update(); 
-  RotationWriter->SetInput(MovingImage); 
-  RotationWriter->SetFileName("Moving.nii.gz"); 
-  RotationWriter->Update(); 
-  RotationWriter->SetInput(RotatedImage); 
-  RotationWriter->SetFileName("Rotated.nii.gz"); 
-  RotationWriter->Update(); 
-  */
   int FixedIndex = 3; 
   int MovingIndex = 5;
   int NumberOfPaddingVoxels = 2; 
@@ -340,8 +303,6 @@ int main(int argc, char * argv[] )
   vnl_vector< InputPixelType > FixedVector = SignificantPatchEigenvectors.get_column(FixedIndex); 
   vnl_vector< InputPixelType > MovingVector = SignificantPatchEigenvectors.get_column(MovingIndex); 
 
-  cout << "FixedVector is " << FixedVector << endl;
-  cout << "MovingVector is " << MovingVector << endl;
   FixedImage = ConvertVectorToSpatialImage< InputImageType, 
              InputImageType, double > ( FixedVector,
                  EigvecMaskImage); 

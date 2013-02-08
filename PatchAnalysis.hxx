@@ -212,14 +212,14 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
   bool OK = true;
 /*  std::cout << "VectorizedImagePatch1 is (before rotation) " << VectorizedImagePatch1 << std::endl;
   std::cout << "VectorizedImagePatch2 is (before rotation) " << VectorizedImagePatch2 << std::endl;*/
-  std::cout << "GradientMatrix1 is " << GradientMatrix1 << std::endl; 
-  std::cout << "GradientMatrix2 is " << GradientMatrix2 << std::endl; 
+/*  std::cout << "GradientMatrix1 is " << GradientMatrix1 << std::endl; 
+  std::cout << "GradientMatrix2 is " << GradientMatrix2 << std::endl; */
   vnl_matrix< RealType > CovarianceMatrixOfImage1 = GradientMatrix1.transpose() * GradientMatrix1; 
   vnl_matrix< RealType > CovarianceMatrixOfImage2 = GradientMatrix2.transpose() * GradientMatrix2; 
   vnl_symmetric_eigensystem< RealType > EigOfImage1( CovarianceMatrixOfImage1 ); 
   vnl_symmetric_eigensystem< RealType > EigOfImage2( CovarianceMatrixOfImage2 ); 
-  std::cout << "CovarianceMatrixOfImage1 is " << CovarianceMatrixOfImage1 << std::endl; 
-  std::cout << "CovarianceMatrixOfImage2 is " << CovarianceMatrixOfImage2 << std::endl;
+/*  std::cout << "CovarianceMatrixOfImage1 is " << CovarianceMatrixOfImage1 << std::endl; 
+  std::cout << "CovarianceMatrixOfImage2 is " << CovarianceMatrixOfImage2 << std::endl;*/
   int NumberOfEigenvectors = EigOfImage1.D.cols(); 
   // FIXME: needs bug checking to make sure this is right
   // not sure how many eigenvectors there are or how they're indexed
@@ -237,10 +237,10 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
    * Refs: http://journals.iucr.org/a/issues/1976/05/00/a12999/a12999.pdf 
    *       http://www.control.auc.dk/~tb/best/aug23-Bak-svdalg.pdf */
   vnl_matrix< RealType > B = outer_product( Image1Eigvec1, Image2Eigvec1 );
-  std::cout << "Image1Eigvec1 is " <<  Image1Eigvec1 << std::endl;
+ /* std::cout << "Image1Eigvec1 is " <<  Image1Eigvec1 << std::endl;
   std::cout << "Image1Eigvec2 " << Image1Eigvec2 << std::endl;
   std::cout << "Image2Eigvec1 is " << Image2Eigvec1 << std::endl;
-  std::cout << "Image2Eigvec2 is " << Image2Eigvec2 << std::endl;
+  std::cout << "Image2Eigvec2 is " << Image2Eigvec2 << std::endl;*/
   if( ImageDimension == 3)
   {
     B = outer_product( Image1Eigvec1, Image2Eigvec1 ) + 
@@ -268,14 +268,14 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
     {
       RotatedPoint[ dd ] = RotatedPointVector[ dd ] + CenterPointOfImage2[ dd ];
     } 
-    std::cout << "Original Point is " << ImagePatch2[ii] << ", Reoriented is " << RotatedPoint << std::endl;
+//    std::cout << "Original Point is " << ImagePatch2[ii] << ", Reoriented is " << RotatedPoint << std::endl;
     if( Interpolator->IsInsideBuffer( RotatedPoint) )
     {
       VectorizedImagePatch2[ ii ] = Interpolator->Evaluate( RotatedPoint );
     }
     else OK = false; 
   }
-  std::cout << "VectorizedImagePatch2 is " <<  VectorizedImagePatch2 << std::endl;
+//  std::cout << "VectorizedImagePatch2 is " <<  VectorizedImagePatch2 << std::endl;
   // Generate image to return
   typename  TImageType::Pointer ReorientedImage = TImageType::New();
   ReorientedImage = ConvertVectorToSpatialImage<TImageType, 
