@@ -300,8 +300,8 @@ int main(int argc, char * argv[] )
   RotationWriter->SetFileName("Rotated.nii.gz"); 
   RotationWriter->Update(); 
   */
-  int FixedIndex = 17; 
-  int MovingIndex = 19;
+  int FixedIndex = 3; 
+  int MovingIndex = 5;
   int NumberOfPaddingVoxels = 2; 
   int RadiusOfPatch = SizeOfPatches; 
   typedef itk::NeighborhoodIterator< InputImageType > NeighborhoodIteratorType;
@@ -314,6 +314,11 @@ int main(int argc, char * argv[] )
   typedef itk::SmartPointer<GradientImageType>                                    GradientImagePointer;
   typedef itk::GradientRecursiveGaussianImageFilter<InputImageType, GradientImageType> GradientImageFilterType;
   typedef typename GradientImageFilterType::Pointer                               GradientImageFilterPointer;
+  typedef itk::NeighborhoodIterator< GradientImageType >                          GradientNeighborhoodIteratorType; 
+
+  RealType     GradientSigma = 1.0;
+  GradientImageFilterPointer FixedGradientFilter = GradientImageFilterType::New(); 
+  GradientImageFilterPointer MovingGradientFilter = GradientImageFilterType::New(); 
 
   for( unsigned int dd = 0; dd < Dimension; dd++)
   {
@@ -331,6 +336,7 @@ int main(int argc, char * argv[] )
   ImageWriterType::Pointer RotationWriter = ImageWriterType::New(); 
   ImageWriterType::Pointer FixedWriter = ImageWriterType::New(); 
   ImageWriterType::Pointer MovingWriter = ImageWriterType::New(); 
+  
   vnl_vector< InputPixelType > FixedVector = SignificantPatchEigenvectors.get_column(FixedIndex); 
   vnl_vector< InputPixelType > MovingVector = SignificantPatchEigenvectors.get_column(MovingIndex); 
 
@@ -342,6 +348,17 @@ int main(int argc, char * argv[] )
   MovingImage = ConvertVectorToSpatialImage< InputImageType, 
               InputImageType, double > ( MovingVector, 
                   EigvecMaskImage);
+  
+  FixedGradientFilter->SetInput( FixedImage ); 
+  FixedGradientFilter->SetSigma( GradientSigma ); 
+  FixedGradientFilter->Update();
+  GradientImageType::Pointer FixedGradientImage = FixedGradientFilter->GetOutput();
+
+  MovingGradientFilter->SetInput( MovingImage ); 
+  MovingGradientFilter->Update( ); 
+  GradientImageType::Pointer MovingGradientImage = MovingGradientFilter->GetOutput(); 
+  
+
   NeighborhoodIteratorType FixedIterator( radius, FixedImage, SphereRegion ); 
   NeighborhoodIteratorType MovingIterator( radius, MovingImage, SphereRegion ); 
   FixedWriter->SetInput(FixedImage); 
@@ -356,15 +373,15 @@ int main(int argc, char * argv[] )
   interp1->SetInputImage( MovingImage ); //really?
   ReorientedEigvec = 
     ReorientPatchToReferenceFrame< Dimension, InputPixelType, InputImageType, 
-    InputImageType, InterpPointer > (
+    GradientImageType, InterpPointer > (
 	FixedIterator, 
 	MovingIterator, 
         EigvecMaskImage,
 	IndicesWithinSphere, 
 	Weights,
-	FixedImage, 
-	MovingImage, 
-	NumberOfValuesPerVoxel, 
+	FixedGradientImage, 
+	MovingGradientImage, 
+	Dimension, 
 	interp1
 	);
 

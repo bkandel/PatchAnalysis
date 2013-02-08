@@ -210,15 +210,16 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
       CenteredVectorizedImagePatch2 ) / ( StDevOfImage1 * StDevOfImage2 );
 
   bool OK = true;
-  std::cout << "VectorizedImagePatch1 is (before rotation) " << VectorizedImagePatch1 << std::endl;
-  std::cout << "VectorizedImagePatch2 is (before rotation) " << VectorizedImagePatch2 << std::endl;
+/*  std::cout << "VectorizedImagePatch1 is (before rotation) " << VectorizedImagePatch1 << std::endl;
+  std::cout << "VectorizedImagePatch2 is (before rotation) " << VectorizedImagePatch2 << std::endl;*/
   std::cout << "GradientMatrix1 is " << GradientMatrix1 << std::endl; 
-  std::cout << "GradientMatrix2 is " << GradientMatrix2 << std::endl;
+  std::cout << "GradientMatrix2 is " << GradientMatrix2 << std::endl; 
   vnl_matrix< RealType > CovarianceMatrixOfImage1 = GradientMatrix1.transpose() * GradientMatrix1; 
   vnl_matrix< RealType > CovarianceMatrixOfImage2 = GradientMatrix2.transpose() * GradientMatrix2; 
   vnl_symmetric_eigensystem< RealType > EigOfImage1( CovarianceMatrixOfImage1 ); 
   vnl_symmetric_eigensystem< RealType > EigOfImage2( CovarianceMatrixOfImage2 ); 
-  std::cout << CovarianceMatrixOfImage2 << std::endl;
+  std::cout << "CovarianceMatrixOfImage1 is " << CovarianceMatrixOfImage1 << std::endl; 
+  std::cout << "CovarianceMatrixOfImage2 is " << CovarianceMatrixOfImage2 << std::endl;
   int NumberOfEigenvectors = EigOfImage1.D.cols(); 
   // FIXME: needs bug checking to make sure this is right
   // not sure how many eigenvectors there are or how they're indexed
@@ -246,9 +247,9 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
         outer_product( Image1Eigvec2, Image2Eigvec2 ); 
   }
   vnl_svd< RealType > WahbaSVD( B );
-  std::cout << B << std::endl;
+  std::cout << "B is " << B << std::endl;
   vnl_matrix< RealType > Q_solution = WahbaSVD.V() * WahbaSVD.U().transpose();
-  std::cout << Q_solution << std::endl;
+  std::cout << "Q_solution is " << Q_solution << std::endl;
   // Now rotate the points to the same frame and sample neighborhoods again.
   for( unsigned int ii = 0; ii < NumberOfIndicesWithinSphere; ii++ )
   {
@@ -267,7 +268,7 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
     {
       RotatedPoint[ dd ] = RotatedPointVector[ dd ] + CenterPointOfImage2[ dd ];
     } 
-//    std::cout << "Original Point is " << ImagePatch2[ii] << ", Reoriented is " << RotatedPoint << std::endl;
+    std::cout << "Original Point is " << ImagePatch2[ii] << ", Reoriented is " << RotatedPoint << std::endl;
     if( Interpolator->IsInsideBuffer( RotatedPoint) )
     {
       VectorizedImagePatch2[ ii ] = Interpolator->Evaluate( RotatedPoint );
