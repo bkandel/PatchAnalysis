@@ -145,7 +145,7 @@ typename InputImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< InputP
 
 template< unsigned int ImageDimension, class TRealType, class TImageType, 
   class TGradientImageType, class TInterpolator > 
-typename TImageType::Pointer ReorientPatchToReferenceFrame( 
+vnl_vector< TRealType > ReorientPatchToReferenceFrame( 
     itk::NeighborhoodIterator< TImageType > GradientImageNeighborhood1, 
     itk::NeighborhoodIterator< TImageType > GradientImageNeighborhood2,
     const typename TImageType::Pointer MaskImage, 
@@ -215,7 +215,7 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
       ImagePatch1.push_back( Point1 ); 
       ImagePatch2.push_back( Point2 ); 
     }
-    else return 0; 
+    else return vnl_vector< TRealType > (1, 0.0 ); 
   }
   RealType MeanOfImagePatch1 = VectorizedImagePatch1.mean(); 
   RealType MeanOfImagePatch2 = VectorizedImagePatch2.mean(); 
@@ -308,7 +308,8 @@ typename TImageType::Pointer ReorientPatchToReferenceFrame(
 	VectorizedImagePatch2[ ii ] );
   }*/
 
-  return ReorientedImage; 
+//  return ReorientedImage; 
+    return VectorizedImagePatch2; 
 }
 
 

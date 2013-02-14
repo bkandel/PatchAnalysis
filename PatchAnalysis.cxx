@@ -271,7 +271,7 @@ int main(int argc, char * argv[] )
   
   
   // output sample patch 
-  int SamplePatchNumber = 400; 
+  int SamplePatchNumber = 1000; 
   InputImageType::Pointer SamplePatchImage = InputImageType::New(); 
   vnl_vector< InputPixelType > SamplePatchVector =
 	      PatchesForAllPointsWithinMask.get_column( SamplePatchNumber );  
@@ -330,6 +330,8 @@ int main(int argc, char * argv[] )
   
   vnl_vector< InputPixelType > FixedVector = SignificantPatchEigenvectors.get_column(FixedIndex); 
   vnl_vector< InputPixelType > MovingVector = SignificantPatchEigenvectors.get_column(MovingIndex); 
+  vnl_vector< InputPixelType > RotatedVector = MovingVector; 
+  RotatedVector.fill( 0.0 ); 
 
   FixedImage = ConvertVectorToSpatialImage< InputImageType, 
              InputImageType, double > ( FixedVector,
@@ -360,7 +362,7 @@ int main(int argc, char * argv[] )
   unsigned int NumberOfValuesPerVoxel = 1;
   cout << "Weights are " << Weights.size() << endl;
   interp1->SetInputImage( MovingImage ); 
-  ReorientedEigvec = 
+  RotatedVector = 
     ReorientPatchToReferenceFrame< Dimension, InputPixelType, InputImageType, 
     GradientImageType, InterpPointer > (
 	FixedIterator, 
@@ -373,6 +375,9 @@ int main(int argc, char * argv[] )
 	Dimension, 
 	interp1
 	);
+  
+  ReorientedEigvec = ConvertVectorToSpatialImage< InputImageType, 
+		   InputImageType, double > (RotatedVector, EigvecMaskImage); 
 
   RotationWriter->SetInput(ReorientedEigvec); 
   RotationWriter->SetFileName("Rotated.nii.gz"); 
