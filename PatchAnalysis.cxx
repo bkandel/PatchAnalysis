@@ -16,6 +16,7 @@
 #include <itkStatisticsImageFilter.h>
 #include "itkImageRegionIterator.h"
 #include "PatchAnalysis.hxx"
+#include "PatchAnalysis.h"
 #include "itkLinearInterpolateImageFunction.h"
 #include "itkGradientImageFilter.h"
 #include "itkCovariantVector.h"
@@ -227,6 +228,7 @@ int main(int argc, char * argv[] )
   cout << "Recorded patches for all points." << endl;
 
   // Compute correlation 
+  
 
 
 //  RotatedImage
@@ -262,6 +264,32 @@ int main(int argc, char * argv[] )
     EigvecWriter->SetFileName(EigvecFileName);  
     EigvecWriter->Update(); 
   }
+
+  
+  
+  
+  
+  
+  // output sample patch 
+  int SamplePatchNumber = 400; 
+  InputImageType::Pointer SamplePatchImage = InputImageType::New(); 
+  vnl_vector< InputPixelType > SamplePatchVector =
+	      PatchesForAllPointsWithinMask.get_column( SamplePatchNumber );  
+
+  SamplePatchImage = ConvertVectorToSpatialImage< InputImageType, 
+		   InputImageType, double >( SamplePatchVector,  
+		       EigvecMaskImage ); 
+  ImageWriterType::Pointer SamplePatchImageWriter = ImageWriterType::New(); 
+  SamplePatchImageWriter->SetInput( SamplePatchImage ); 
+  SamplePatchImageWriter->SetFileName( "SamplePatch.nii.gz" ); 
+  SamplePatchImageWriter->Update(); 
+  
+  
+  
+  
+  
+  
+  
   // test rotation of eigenvectors 
   int FixedIndex = 3; 
   int MovingIndex = 5;
@@ -331,7 +359,7 @@ int main(int argc, char * argv[] )
   InputImageType::Pointer ReorientedEigvec;
   unsigned int NumberOfValuesPerVoxel = 1;
   cout << "Weights are " << Weights.size() << endl;
-  interp1->SetInputImage( MovingImage ); //really?
+  interp1->SetInputImage( MovingImage ); 
   ReorientedEigvec = 
     ReorientPatchToReferenceFrame< Dimension, InputPixelType, InputImageType, 
     GradientImageType, InterpPointer > (

@@ -85,6 +85,23 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
 
 }
 
+/*PatchAnalysisObject::PatchAnalysisObject ( 
+    double InputImage)
+{
+
+}
+*/
+
+
+
+
+
+
+
+
+
+
+
 
 template< class InputImageType, class InputImage, class InputPixelType >
 typename InputImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< InputPixelType > &Vector, 
