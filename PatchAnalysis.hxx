@@ -264,9 +264,9 @@ vnl_vector< TRealType > ReorientPatchToReferenceFrame(
         outer_product( Image1Eigvec2, Image2Eigvec2 ); 
   }
   vnl_svd< RealType > WahbaSVD( B );
-  std::cout << "B is " << B << std::endl;
+//  std::cout << "B is " << B << std::endl;
   vnl_matrix< RealType > Q_solution = WahbaSVD.V() * WahbaSVD.U().transpose();
-  std::cout << "Q_solution is " << Q_solution << std::endl;
+//  std::cout << "Q_solution is " << Q_solution << std::endl;
   // Now rotate the points to the same frame and sample neighborhoods again.
   for( unsigned int ii = 0; ii < NumberOfIndicesWithinSphere; ii++ )
   {

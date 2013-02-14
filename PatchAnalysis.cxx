@@ -291,7 +291,7 @@ int main(int argc, char * argv[] )
   
   
   // test rotation of eigenvectors 
-  int FixedIndex = 3; 
+  int FixedIndex = 1; // reorient to second eigenvector--first is constant 
   int MovingIndex = 5;
   int NumberOfPaddingVoxels = 2; 
   int RadiusOfPatch = SizeOfPatches; 
@@ -382,6 +382,117 @@ int main(int argc, char * argv[] )
   RotationWriter->SetInput(ReorientedEigvec); 
   RotationWriter->SetFileName("Rotated.nii.gz"); 
   RotationWriter->Update(); 
+
+
+  vnl_matrix< InputPixelType > ReorientedPatches = 
+    PatchesForAllPointsWithinMask ; 
+  ReorientedPatches.fill( 0.0 );
+  // allocate vars to be used in the loop
+  vnl_vector< InputPixelType > MovingPatchVector = 
+    SignificantPatchEigenvectors.get_column( 1 ) ;
+  InputImageType::Pointer MovingPatchImage = InputImageType::New(); 
+  // reorient all patches to second eigenvector
+  for( int jj = 0; jj < PatchesForAllPointsWithinMask.columns(); jj++)
+  {
+//    int MovingPatchIndex = jj;
+    MovingPatchVector = PatchesForAllPointsWithinMask.get_column( jj ); // MovingPatchIndex ); 
+    MovingPatchImage = 
+      ConvertVectorToSpatialImage< InputImageType, InputImageType, double > (
+	  MovingPatchVector, EigvecMaskImage ); 
+    GradientImageFilterPointer MovingPatchGradientFilter = GradientImageFilterType::New(); 
+    MovingPatchGradientFilter->SetInput( MovingPatchImage ); 
+    MovingPatchGradientFilter->SetSigma( GradientSigma ); 
+    MovingPatchGradientFilter->Update(); 
+    GradientImageType::Pointer MovingPatchGradientImage = 
+      MovingPatchGradientFilter->GetOutput(); 
+    NeighborhoodIteratorType MovingPatchIterator( radius, MovingPatchImage, SphereRegion ); 
+    vnl_vector< InputPixelType > MovingPatchVectorReoriented; 
+    interp1->SetInputImage( MovingPatchImage ); 
+    MovingPatchVectorReoriented = 
+      ReorientPatchToReferenceFrame< Dimension, InputPixelType, InputImageType, 
+      GradientImageType, InterpPointer > (
+	  FixedIterator, 
+	  MovingPatchIterator, 
+	  EigvecMaskImage, 
+	  IndicesWithinSphere, 
+	  Weights, 
+	  FixedGradientImage, 
+	  MovingPatchGradientImage, 
+	  Dimension, 
+	  interp1
+	  ); 
+    ReorientedPatches.set_column( jj, MovingPatchVectorReoriented );
+    if( (jj % 1000) == 0 )
+    {
+      cout << "We're on index " << jj << " out of " << 
+	PatchesForAllPointsWithinMask.columns() << "." << endl;
+    }
+  }
+  cout << "Done reorienting." << endl;
+
+  // sample reoriented patches to compute eigvecs
+  int ReorientedPatchIter = 0; 
+  int ReorientedPatchIndex = 0;
+
+  vnl_matrix< InputPixelType > ReorientedPatchSamples( NumberOfPatches, ReorientedPatches.rows() ) ;
+  // switch rows and columns for SVD...FIXME i think this is right
+  ReorientedPatchSamples.fill( 0 ); 
+  while( ReorientedPatchIter < NumberOfPatches )
+  {
+    ReorientedPatchIndex = rand() % ReorientedPatches.columns() ; 
+    ReorientedPatchSamples.set_row( ReorientedPatchIter,  
+	ReorientedPatches.get_column( ReorientedPatchIndex ) ); 
+    // for svd, each row is one observation--i know it's weird...FIXME check this. 
+    ReorientedPatchIter++ ; 
+  }
+  cout << "This is updated." << endl; 
+  cout << "Got " << ReorientedPatchIter << " samples." << endl; 
+  cout << "ReorientedPatchSamples is " << ReorientedPatchSamples.rows() << 
+    "x" << ReorientedPatchSamples.columns() << endl;; 
+  vnl_svd< InputPixelType > SVDOfReorientedPatches( ReorientedPatchSamples );
+  cout << "Calculated SVD of reoriented patches." << endl;
+
+
+  vnl_matrix< InputPixelType > ReorientedPatchEigenvectors = 
+    SVDOfReorientedPatches.V(); 
+  SumOfEigenvalues = 0.0; 
+  for( int i = 0; i < SVDOfReorientedPatches.rank(); i++)
+  {
+    SumOfEigenvalues += SVDOfReorientedPatches.W( i, i ); 
+  }
+  PartialSumOfEigenvalues = 0.0; 
+  PercentVarianceExplained = 0.0; 
+  i = 0; 
+  while( PercentVarianceExplained < TargetPercentVarianceExplained && 
+      i < svd.rank() )
+  {
+    PartialSumOfEigenvalues += SVDOfReorientedPatches.W( i, i ); 
+    PercentVarianceExplained = PartialSumOfEigenvalues / 
+      SumOfEigenvalues ; 
+    i++; 
+  }
+  int NumberOfEigenvectorsForReorientedPatches = i; 
+  cout << "It took " << NumberOfEigenvectorsForReorientedPatches << 
+    " eigenvectors to reach " << TargetPercentVarianceExplained * 100 << 
+    "% variance explained for reoriented patches." << endl;
+
+
+  // write out eigenvectors 
+  for ( unsigned int ii = 0; ii < NumberOfEigenvectorsForReorientedPatches; ii++)
+  {
+    vnl_vector< InputPixelType > EigvecAsVector =
+                ReorientedPatchEigenvectors.get_column( ii );
+    string ImageIndex;
+    ostringstream convert;
+    convert << ii;
+    ImageIndex = convert.str();
+    EigvecWriter->SetInput( ConvertVectorToSpatialImage< InputImageType,
+        InputImageType, double >( EigvecAsVector,
+          EigvecMaskImage) );
+    string EigvecFileName = "ReorientedEigvec" + ImageIndex + ".nii.gz" ;
+    EigvecWriter->SetFileName(EigvecFileName);
+    EigvecWriter->Update();
+  }
 
 
 
