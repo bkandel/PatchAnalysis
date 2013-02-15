@@ -475,7 +475,10 @@ int main(int argc, char * argv[] )
   cout << "It took " << NumberOfEigenvectorsForReorientedPatches << 
     " eigenvectors to reach " << TargetPercentVarianceExplained * 100 << 
     "% variance explained for reoriented patches." << endl;
-
+  
+  vnl_matrix< InputPixelType > SignificantReorientedPatchEigenvectors ; 
+  SignificantReorientedPatchEigenvectors = 
+    ReorientedPatchEigenvectors.get_n_columns(0, NumberOfEigenvectorsForReorientedPatches );
 
   // write out eigenvectors 
   for ( unsigned int ii = 0; ii < NumberOfEigenvectorsForReorientedPatches; ii++)
@@ -548,6 +551,65 @@ int main(int argc, char * argv[] )
     CoefficientImageWriter->Update(); 
   }
 
-  
+ 
+
+
+
+  // do same for reoriented eigenvectors
+
+  cout << "Computing regression for reoriented eigenvectors." << endl;
+  vnl_matrix< InputPixelType >
+    ReorientedEigenvectorCoefficients( NumberOfEigenvectorsForReorientedPatches, SumOfMaskImage );
+  ReorientedEigenvectorCoefficients.fill( 0 );
+  vnl_svd< InputPixelType > ReorientedRegressionSVD(SignificantReorientedPatchEigenvectors);
+//  EigenvectorCoefficients =  RegressionSVD.solve(PatchesForAllPointsWithinMask); 
+//  not feasible for large matrices
+  for( int i = 0; i < SumOfMaskImage; ++i)
+  {
+    vnl_vector< InputPixelType > ReorientedPatchOfInterest =
+      ReorientedPatches.get_column(i);
+    vnl_vector< InputPixelType > x( NumberOfEigenvectorsForReorientedPatches );
+    x.fill( 0 );
+    x = ReorientedRegressionSVD.solve(ReorientedPatchOfInterest);
+    ReorientedEigenvectorCoefficients.set_column(i, x);
+  }
+  vnl_matrix< InputPixelType > ReconstructedReorientedPatches = 
+    SignificantReorientedPatchEigenvectors * ReorientedEigenvectorCoefficients;
+  vnl_matrix< InputPixelType > ReorientedError = ReconstructedReorientedPatches - ReorientedPatches; 
+  vnl_vector< InputPixelType > ReorientedPercentError(ReorientedError.columns() );
+  for( int i = 0; i < ReorientedError.columns(); ++i)
+  {
+    ReorientedPercentError(i) = ReorientedError.get_column(i).two_norm() / 
+      (ReorientedPatches.get_column(i).two_norm() + 1e-10);
+  }
+  cout << "Average percent error for reoriented patches is " << ReorientedPercentError.mean() * 100 << "%, with max of " <<
+    ReorientedPercentError.max_value() * 100 << "%." <<  endl;
+  cout << "ReorientedEigenvectorCoefficients is " << ReorientedEigenvectorCoefficients.rows() << "x" <<
+    ReorientedEigenvectorCoefficients.columns() << "." << endl;
+
+  InputImageType::Pointer ReorientedConvertedImage;
+  for( int i = 0; i < ReorientedEigenvectorCoefficients.rows(); ++i)
+  {
+    vnl_vector< InputPixelType > ReorientedRegressionCoefficient =
+      ReorientedEigenvectorCoefficients.get_row(i);
+    ReorientedConvertedImage = ConvertVectorToSpatialImage<InputImageType,InputImageType,double>(
+      ReorientedRegressionCoefficient, MaskImage);
+    typedef itk::ImageFileWriter< InputImageType > ImageWriterType;
+    ImageWriterType::Pointer  ReorientedCoefficientImageWriter = ImageWriterType::New();
+    ReorientedCoefficientImageWriter->SetInput( ReorientedConvertedImage );
+    string ImageIndex;
+    ostringstream convert;
+    convert << i;
+    ImageIndex = convert.str();
+    string ReorientedCoefficientImageFileName = "ReorientedCoeffsOut" + ImageIndex + ".nii.gz";
+    ReorientedCoefficientImageWriter->SetFileName( ReorientedCoefficientImageFileName );
+    ReorientedCoefficientImageWriter->Update();
+  }
+
+
+
+
+
+
   return 0;   
 }
