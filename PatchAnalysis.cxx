@@ -611,5 +611,66 @@ int main(int argc, char * argv[] )
 
 
 
+  /* Predict modality B from modality A: 
+   * I don't yet have masks for ASL images, 
+   * so for now I'm just predicting T1 from T1 
+   * to make sure the machinery works.  */
+  InputImageType::Pointer modality2Image; 
+  InputImageType::Pointer modality2Mask; 
+  modality2Image = InputImage; // FIXME will change to ASL once i have masks
+  modality2Mask  = MaskImage; // ditto
+  // Count number of nonzero voxels in modality2Image
+  // WARNING: ASSUMES MASK IS BINARY!!!
+  StatisticsFilter->SetInput( modality2Mask ); 
+  StatisticsFilter->Update( ); 
+  int sumOfModality2Mask = StatisticsFilter->GetSum( ); 
+  cout << "Number of voxels to be predicted: " << sumOfModality2Mask << "." << endl;
+  InputImageType::IndexType modality2Index; 
+  vnl_matrix< int > allIndicesInModality2Image( sumOfModality2Mask, Dimension );
+  allIndicesInModality2Image.fill( 0 ); 
+  vnl_vector < InputPixelType > vectorizedModality2Image( sumOfModality2Mask ); 
+  vectorizedModality2Image.fill( 0 ); 
+  ImageIteratorType modality2MaskIterator( modality2Mask, 
+      modality2Mask->GetLargestPossibleRegion() );
+  ImageIteratorType modality2ImageIterator( modality2Image, 
+      modality2Image->GetLargestPossibleRegion() ); 
+  int modality2MaskCounter = 0; 
+  for( modality2MaskIterator.GoToBegin(), modality2ImageIterator.GoToBegin(); 
+      !modality2MaskIterator.IsAtEnd(); ++modality2MaskIterator, ++modality2ImageIterator)
+  {
+    if(modality2MaskIterator.Get() > 0 )
+    {
+      for( int ii = 0; ii < Dimension; ii++)
+      {
+	allIndicesInModality2Image( modality2MaskCounter, ii ) = 
+	  modality2MaskIterator.GetIndex()[ ii ];
+	vectorizedModality2Image( modality2MaskCounter ) = 
+	  modality2ImageIterator.Get(); 
+      }
+      modality2MaskCounter++; 
+    }
+  }
+  cout << "Number of points is: " << modality2MaskCounter << endl;
+  //reconstruct modality 2
+  vnl_svd < InputPixelType > reorientedEigenvectorCoefficientSVD( 
+      ReorientedEigenvectorCoefficients.transpose() ); // because of funny dimensionality
+  vnl_vector< InputPixelType > coefficientsForPredictingModality2( sumOfModality2Mask ); 
+  coefficientsForPredictingModality2.fill( 0 ); 
+  coefficientsForPredictingModality2 = 
+    reorientedEigenvectorCoefficientSVD.solve( vectorizedModality2Image ); 
+  vnl_vector< InputPixelType > reconstructedModality2( sumOfModality2Mask ); 
+  reconstructedModality2 = ReorientedEigenvectorCoefficients.transpose() * 
+    coefficientsForPredictingModality2;
+  // calculate correlation coeff of reconstruction
+  vnl_vector< InputPixelType > centeredVectorizedModality2Image = 
+    vectorizedModality2Image - vectorizedModality2Image.mean(); 
+  vnl_vector< InputPixelType > centeredReconstructedModality2 = 
+    reconstructedModality2 - reconstructedModality2.mean();
+  double correlationBetweenActualAndReconstructedImageModality2 = 
+    inner_product( centeredVectorizedModality2Image, centeredReconstructedModality2 ) / 
+    (centeredVectorizedModality2Image.two_norm() * centeredReconstructedModality2.two_norm() ); 
+  cout << "CorrCoef is " << correlationBetweenActualAndReconstructedImageModality2 << "." << endl;
+
+
   return 0;   
 }
