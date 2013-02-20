@@ -654,11 +654,6 @@ int main(int argc, char * argv[] )
 	IndexAsPoint; 
       allIndicesInModality2Image[ modality2MaskCounter ] = 
 	modality2MaskIterator.GetIndex(); 
-/*      for( int ii = 0; ii < Dimension; ii++)
-      {
-	allIndicesInModality2Image( modality2MaskCounter, ii ) = 
-	  modality2MaskIterator.GetIndex()[ ii ];
-      }*/
       modality2MaskCounter++; 
     }
   }
@@ -684,9 +679,9 @@ int main(int argc, char * argv[] )
     {
       reorientedEigenvectorCoefficientsResampledToModality2Image( ii, jj ) = 
 	interpolatorForModality1->Evaluate( centerPointsOfModality2ImagePixels[ jj ] );
-      if( ii > 50 & jj > 18360 ) 
+      if( ii > 50 & jj > 18240 ) 
       { 
-	cout << "For index " << centerPointsOfModality2ImagePixels[ jj ] << 
+	cout << "For point " << centerPointsOfModality2ImagePixels[ jj ] << 
 	  ", interpolated value is " << interpolatorForModality1->Evaluate( 
 	      centerPointsOfModality2ImagePixels[ jj ] ) << 
 	  " and original value is " <<  reorientedEigenvectorCoefficientImage->GetPixel( 
@@ -701,10 +696,6 @@ int main(int argc, char * argv[] )
     reorientedEigenvectorCoefficientsResampledToModality2Image.rows() << "x" << 
     reorientedEigenvectorCoefficientsResampledToModality2Image.columns() << "." << endl;
   
-
-
-  cout << reorientedEigenvectorCoefficientsResampledToModality2Image.get_column( 13 ) << endl; 
-
   vnl_svd < InputPixelType > reorientedEigenvectorCoefficientSVD( 
       reorientedEigenvectorCoefficientsResampledToModality2Image.transpose() ); // because of funny dimensionality
   vnl_vector< InputPixelType > coefficientsForPredictingModality2( sumOfModality2Mask ); 
