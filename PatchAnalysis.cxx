@@ -21,6 +21,7 @@
 #include "itkGradientImageFilter.h"
 #include "itkCovariantVector.h"
 #include "itkGradientRecursiveGaussianImageFilter.h"
+#include "itkBSplineInterpolateImageFunction.h"
 using namespace std; 
 
 int main(int argc, char * argv[] )
@@ -37,6 +38,8 @@ int main(int argc, char * argv[] )
   const unsigned int  NumberOfPatches = 1000; 
 
   typedef itk::Image< InputPixelType, Dimension >   InputImageType;
+  typedef InputImageType::PointType   PointType; 
+
   InputImageType::Pointer InputImage;
   InputImageType::Pointer MaskImage;  
   InputImageType::Pointer PatchImage; 
@@ -626,8 +629,9 @@ int main(int argc, char * argv[] )
   int sumOfModality2Mask = StatisticsFilter->GetSum( ); 
   cout << "Number of voxels to be predicted: " << sumOfModality2Mask << "." << endl;
   InputImageType::IndexType modality2Index; 
-  vnl_matrix< int > allIndicesInModality2Image( sumOfModality2Mask, Dimension );
-  allIndicesInModality2Image.fill( 0 ); 
+  std::vector< InputImageType::IndexType > allIndicesInModality2Image( sumOfModality2Mask );
+  std::vector< PointType > centerPointsOfModality2ImagePixels( sumOfModality2Mask ); 
+ 
   vnl_vector < InputPixelType > vectorizedModality2Image( sumOfModality2Mask ); 
   vectorizedModality2Image.fill( 0 ); 
   ImageIteratorType modality2MaskIterator( modality2Mask, 
@@ -636,24 +640,73 @@ int main(int argc, char * argv[] )
       modality2Image->GetLargestPossibleRegion() ); 
   int modality2MaskCounter = 0; 
   for( modality2MaskIterator.GoToBegin(), modality2ImageIterator.GoToBegin(); 
-      !modality2MaskIterator.IsAtEnd(); ++modality2MaskIterator, ++modality2ImageIterator)
+      !modality2MaskIterator.IsAtEnd(); 
+      ++modality2MaskIterator, ++modality2ImageIterator)
   {
     if(modality2MaskIterator.Get() > 0 )
     {
-      for( int ii = 0; ii < Dimension; ii++)
+      PointType IndexAsPoint; 
+      vectorizedModality2Image( modality2MaskCounter ) = 
+	modality2ImageIterator.Get(); 
+      modality2Image->TransformIndexToPhysicalPoint( 
+	    modality2MaskIterator.GetIndex(), IndexAsPoint ); 
+      centerPointsOfModality2ImagePixels[ modality2MaskCounter ] = 
+	IndexAsPoint; 
+      allIndicesInModality2Image[ modality2MaskCounter ] = 
+	modality2MaskIterator.GetIndex(); 
+/*      for( int ii = 0; ii < Dimension; ii++)
       {
 	allIndicesInModality2Image( modality2MaskCounter, ii ) = 
 	  modality2MaskIterator.GetIndex()[ ii ];
-	vectorizedModality2Image( modality2MaskCounter ) = 
-	  modality2ImageIterator.Get(); 
-      }
+      }*/
       modality2MaskCounter++; 
     }
   }
   cout << "Number of points is: " << modality2MaskCounter << endl;
   //reconstruct modality 2
+  // resample image from modality 1 and put in a matrix
+  InterpPointer interpolatorForModality1 = ScalarInterpolatorType::New(); 
+  InputImageType::Pointer reorientedEigenvectorCoefficientImage; 
+  vnl_matrix< InputPixelType > reorientedEigenvectorCoefficientsResampledToModality2Image( 
+      ReorientedEigenvectorCoefficients.rows(), 
+      centerPointsOfModality2ImagePixels.size() );
+  reorientedEigenvectorCoefficientsResampledToModality2Image.fill( 0 );
+  for( int ii = 0; ii < ReorientedEigenvectorCoefficients.rows(); ii++)
+  {
+    vnl_vector< InputPixelType >  reorientedEigenvectorCoefficientVector = 
+      ReorientedEigenvectorCoefficients.get_row( ii );
+
+    reorientedEigenvectorCoefficientImage = ConvertVectorToSpatialImage<
+      InputImageType, InputImageType, double > (
+	  reorientedEigenvectorCoefficientVector, MaskImage );
+    interpolatorForModality1->SetInputImage( reorientedEigenvectorCoefficientImage ); 
+    for( int jj = 0; jj < centerPointsOfModality2ImagePixels.size(); jj++ )
+    {
+      reorientedEigenvectorCoefficientsResampledToModality2Image( ii, jj ) = 
+	interpolatorForModality1->Evaluate( centerPointsOfModality2ImagePixels[ jj ] );
+      if( ii > 50 & jj > 18360 ) 
+      { 
+	cout << "For index " << centerPointsOfModality2ImagePixels[ jj ] << 
+	  ", interpolated value is " << interpolatorForModality1->Evaluate( 
+	      centerPointsOfModality2ImagePixels[ jj ] ) << 
+	  " and original value is " <<  reorientedEigenvectorCoefficientImage->GetPixel( 
+	      allIndicesInModality2Image[ jj ] ) << "." << endl;
+      }
+    }
+
+
+  }
+
+  cout << "reorientedEigenvectorCoefficientsResampledToModality2Image is " << 
+    reorientedEigenvectorCoefficientsResampledToModality2Image.rows() << "x" << 
+    reorientedEigenvectorCoefficientsResampledToModality2Image.columns() << "." << endl;
+  
+
+
+  cout << reorientedEigenvectorCoefficientsResampledToModality2Image.get_column( 13 ) << endl; 
+
   vnl_svd < InputPixelType > reorientedEigenvectorCoefficientSVD( 
-      ReorientedEigenvectorCoefficients.transpose() ); // because of funny dimensionality
+      reorientedEigenvectorCoefficientsResampledToModality2Image.transpose() ); // because of funny dimensionality
   vnl_vector< InputPixelType > coefficientsForPredictingModality2( sumOfModality2Mask ); 
   coefficientsForPredictingModality2.fill( 0 ); 
   coefficientsForPredictingModality2 = 
