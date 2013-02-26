@@ -26,7 +26,7 @@ using namespace std;
 
 int main(int argc, char * argv[] )
 {
-  if( argc < 7) 
+  if( argc < 9) 
   {
     cout << "Usage: " << argv[0] << 
        " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename SizeOfPatches TargetVarianceExplained" << endl; 
@@ -34,7 +34,7 @@ int main(int argc, char * argv[] )
   }
   typedef double      InputPixelType; 
   typedef double      RealType; 
-  const unsigned int  Dimension = 2; // assume 2d images 
+  const unsigned int  Dimension = 3; // assume 3d images
   const unsigned int  NumberOfPatches = 1000; 
 
   typedef itk::Image< InputPixelType, Dimension >   InputImageType;
@@ -43,10 +43,14 @@ int main(int argc, char * argv[] )
   InputImageType::Pointer InputImage;
   InputImageType::Pointer MaskImage;  
   InputImageType::Pointer PatchImage; 
+  InputImageType::Pointer modality2Image; 
+  InputImageType::Pointer modality2MaskImage; 
 
   typedef itk::ImageFileReader< InputImageType > ReaderType;
-  ReaderType::Pointer  inputImageReader = ReaderType::New();
-  ReaderType::Pointer  maskImageReader  = ReaderType::New(); 
+  ReaderType::Pointer  inputImageReader     = ReaderType::New();
+  ReaderType::Pointer  maskImageReader      = ReaderType::New(); 
+  ReaderType::Pointer  modality2ImageReader = ReaderType::New(); 
+  ReaderType::Pointer  modality2MaskReader  = ReaderType::New(); 
 
   const char * inputFilename            = argv[1];
   const char * maskFilename             = argv[2]; 
@@ -55,16 +59,25 @@ int main(int argc, char * argv[] )
   const unsigned int  SizeOfPatches     = atoi(argv[ 5 ]);
   const unsigned int  VolumeOfPatches   = pow(SizeOfPatches, Dimension); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
   double TargetPercentVarianceExplained = atof( argv[ 6 ] ); 
+  const char * modality2Filename        = argv[7]; 
+  const char * modality2MaskName        = argv[8]; 
+
   inputImageReader->SetFileName( inputFilename );
   inputImageReader->Update();
   maskImageReader->SetFileName( maskFilename ); 
   maskImageReader->Update(); 
+  modality2ImageReader->SetFileName( modality2Filename ); 
+  modality2ImageReader->Update(); 
+  modality2MaskReader->SetFileName( modality2MaskName ); 
+  modality2MaskReader->Update(); 
+  
   InputImage = inputImageReader->GetOutput(); 
   MaskImage  = maskImageReader->GetOutput(); 
+  modality2Image = modality2ImageReader->GetOutput(); 
+  modality2MaskImage = modality2MaskReader->GetOutput();
 
   InputImageType::SizeType inputSize =
        InputImage->GetLargestPossibleRegion().GetSize();
-
   typedef itk::RegionOfInterestImageFilter< InputImageType,
                                             InputImageType > ExtractFilterType;
  
@@ -78,7 +91,9 @@ int main(int argc, char * argv[] )
   vnl_vector< int > TestPatchSeed( Dimension );  
   int  PatchSeedIterator = 0;
   int  PatchSeedAttemptIterator = 0; 
-  InputImageType::IndexType PatchIndex;  
+  InputImageType::IndexType PatchIndex; 
+  cout << "Attempting to find seed points. Looking for " << NumberOfPatches << 
+    " points out of " << inputSize << " possible points." << endl;
   while( PatchSeedIterator < NumberOfPatches) 
   {
     for( int i = 0; i < Dimension; ++i)
@@ -135,8 +150,8 @@ int main(int argc, char * argv[] )
       Weights.push_back( 1.0 ); 
     }
   }
-  cout << Iterator.Size() << endl;
-  cout << IndicesWithinSphere.size() << endl;
+  cout << "Iterator.Size() is " << Iterator.Size() << endl;
+  cout << "IndicesWithinSphere.size() is " << IndicesWithinSphere.size() << endl;
 
   // populate matrix with patch values from points in image
   vnl_matrix< InputPixelType > VectorizedPatchMatrix( NumberOfPatches, IndicesWithinSphere.size() ); 
@@ -214,9 +229,11 @@ int main(int argc, char * argv[] )
   
   // generate patches for all points in mask
   vnl_matrix< InputPixelType > PatchesForAllPointsWithinMask( IndicesWithinSphere.size(),  SumOfMaskImage);
+  cout << "PatchesForAllPointsWithinMask is " << PatchesForAllPointsWithinMask.rows() << "x" <<
+    PatchesForAllPointsWithinMask.columns() << "..." << endl;
   PatchesForAllPointsWithinMask.fill( 0 ); 
   for( int i = 0; i < SumOfMaskImage; ++i)
-  {  
+  {
     for( int j = 0; j < Dimension; ++j)
     {
       PatchCenterIndex[ j ] = NonZeroMaskIndices(i, j);
@@ -618,13 +635,13 @@ int main(int argc, char * argv[] )
    * I don't yet have masks for ASL images, 
    * so for now I'm just predicting T1 from T1 
    * to make sure the machinery works.  */
-  InputImageType::Pointer modality2Image; 
-  InputImageType::Pointer modality2Mask; 
-  modality2Image = InputImage; // FIXME will change to ASL once i have masks
-  modality2Mask  = MaskImage; // ditto
+// InputImageType::Pointer modality2Image; 
+//  InputImageType::Pointer modality2Mask; 
+//  modality2Image = InputImage; // FIXME will change to ASL once i have masks
+//  modality2Mask  = MaskImage; // ditto
   // Count number of nonzero voxels in modality2Image
   // WARNING: ASSUMES MASK IS BINARY!!!
-  StatisticsFilter->SetInput( modality2Mask ); 
+  StatisticsFilter->SetInput( modality2MaskImage ); 
   StatisticsFilter->Update( ); 
   int sumOfModality2Mask = StatisticsFilter->GetSum( ); 
   cout << "Number of voxels to be predicted: " << sumOfModality2Mask << "." << endl;
@@ -634,8 +651,8 @@ int main(int argc, char * argv[] )
  
   vnl_vector < InputPixelType > vectorizedModality2Image( sumOfModality2Mask ); 
   vectorizedModality2Image.fill( 0 ); 
-  ImageIteratorType modality2MaskIterator( modality2Mask, 
-      modality2Mask->GetLargestPossibleRegion() );
+  ImageIteratorType modality2MaskIterator( modality2MaskImage, 
+      modality2MaskImage->GetLargestPossibleRegion() );
   ImageIteratorType modality2ImageIterator( modality2Image, 
       modality2Image->GetLargestPossibleRegion() ); 
   int modality2MaskCounter = 0; 
@@ -679,14 +696,6 @@ int main(int argc, char * argv[] )
     {
       reorientedEigenvectorCoefficientsResampledToModality2Image( ii, jj ) = 
 	interpolatorForModality1->Evaluate( centerPointsOfModality2ImagePixels[ jj ] );
-      if( ii > 50 & jj > 18240 ) 
-      { 
-	cout << "For point " << centerPointsOfModality2ImagePixels[ jj ] << 
-	  ", interpolated value is " << interpolatorForModality1->Evaluate( 
-	      centerPointsOfModality2ImagePixels[ jj ] ) << 
-	  " and original value is " <<  reorientedEigenvectorCoefficientImage->GetPixel( 
-	      allIndicesInModality2Image[ jj ] ) << "." << endl;
-      }
     }
 
 
