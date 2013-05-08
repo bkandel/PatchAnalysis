@@ -169,8 +169,17 @@ int main(int argc, char * argv[] )
       VectorizedPatchMatrix( i, j ) = Iterator.GetPixel( IndicesWithinSphere[ j ] );
     }
   }
+
   cout << "VectorizedPatchMatrix is " << VectorizedPatchMatrix.rows() << 
     "x" << VectorizedPatchMatrix.cols() << "." << endl;
+  const unsigned int vectorizedPatchMatrixRows = VectorizedPatchMatrix.rows(); 
+  const unsigned int vectorizedPatchMatrixCols = VectorizedPatchMatrix.cols(); 
+  typedef itk::CSVNumericObjectFileWriter< InputPixelType 
+	   > CSVWriterType; 
+  CSVWriterType::Pointer vectorizedPatchWriter = CSVWriterType::New(); 
+  vectorizedPatchWriter->SetFileName("vectorizedPatches.csv"); 
+  vectorizedPatchWriter->SetInput(&VectorizedPatchMatrix); 
+  vectorizedPatchWriter->Update(); 
   //compute eigendecomposition of patch matrix
   vnl_svd< InputPixelType > svd( VectorizedPatchMatrix ); 
   vnl_matrix< InputPixelType > PatchEigenvectors = svd.V();  
