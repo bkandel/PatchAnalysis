@@ -57,7 +57,8 @@ int main(int argc, char * argv[] )
   const char * outputFilename           = argv[3];
   const char * eigvecFilename           = argv[4]; 
   const unsigned int  SizeOfPatches     = atoi(argv[ 5 ]);
-  const unsigned int  VolumeOfPatches   = pow(static_cast< double > (SizeOfPatches), Dimension); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
+  const unsigned int  VolumeOfPatches   = pow(static_cast< double > (SizeOfPatches), 
+      static_cast< int > (Dimension) ); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
   double TargetPercentVarianceExplained = atof( argv[ 6 ] ); 
   const char * modality2Filename        = argv[7]; 
   const char * modality2MaskName        = argv[8]; 
