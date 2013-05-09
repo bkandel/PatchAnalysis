@@ -218,7 +218,7 @@ int main(int argc, char * argv[] )
   StatisticsFilter->Update(); 
   double SumOfMaskImage = StatisticsFilter->GetSum();
   cout << "Total number of possible points: " << SumOfMaskImage << "." << endl;
-  vnl_matrix< int > NonZeroMaskIndices( SumOfMaskImage, Dimension ); 
+  vnl_matrix< int > NonZeroMaskIndices( int(SumOfMaskImage), Dimension ); 
   typedef  itk::ImageRegionIterator< InputImageType > ImageIteratorType; 
   ImageIteratorType MaskImageIterator( MaskImage , MaskImage->GetLargestPossibleRegion());
   
