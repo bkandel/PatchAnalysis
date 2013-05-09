@@ -216,9 +216,9 @@ int main(int argc, char * argv[] )
   StatisticsFilterType::Pointer StatisticsFilter = StatisticsFilterType::New(); 
   StatisticsFilter->SetInput(MaskImage); 
   StatisticsFilter->Update(); 
-  double SumOfMaskImage = StatisticsFilter->GetSum();
+  int SumOfMaskImage = int( StatisticsFilter->GetSum() ); 
   cout << "Total number of possible points: " << SumOfMaskImage << "." << endl;
-  vnl_matrix< int > NonZeroMaskIndices( int(SumOfMaskImage), Dimension ); 
+  vnl_matrix< int > NonZeroMaskIndices( SumOfMaskImage, Dimension ); 
   typedef  itk::ImageRegionIterator< InputImageType > ImageIteratorType; 
   ImageIteratorType MaskImageIterator( MaskImage , MaskImage->GetLargestPossibleRegion());
   
