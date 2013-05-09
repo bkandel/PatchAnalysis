@@ -653,7 +653,7 @@ int main(int argc, char * argv[] )
   // WARNING: ASSUMES MASK IS BINARY!!!
   StatisticsFilter->SetInput( modality2MaskImage ); 
   StatisticsFilter->Update( ); 
-  int sumOfModality2Mask = StatisticsFilter->GetSum( ); 
+  int sumOfModality2Mask = int( StatisticsFilter->GetSum( ) ); 
   cout << "Number of voxels to be predicted: " << sumOfModality2Mask << "." << endl;
   InputImageType::IndexType modality2Index; 
   std::vector< InputImageType::IndexType > allIndicesInModality2Image( sumOfModality2Mask );
