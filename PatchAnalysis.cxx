@@ -264,7 +264,7 @@ int main(int argc, char * argv[] )
 //  RotatedImage
 
   typedef itk::LinearInterpolateImageFunction<InputImageType,float> ScalarInterpolatorType;
-  typedef typename ScalarInterpolatorType::Pointer InterpPointer;
+  typedef ScalarInterpolatorType::Pointer InterpPointer;
   InterpPointer interp1 =  ScalarInterpolatorType::New();
 
 
@@ -314,7 +314,7 @@ int main(int argc, char * argv[] )
   SamplePatchImageWriter->SetFileName( "SamplePatch.nii.gz" ); 
   SamplePatchImageWriter->Update(); 
   
-  
+
   
   
   
@@ -327,14 +327,14 @@ int main(int argc, char * argv[] )
   int RadiusOfPatch = SizeOfPatches; 
   typedef itk::NeighborhoodIterator< InputImageType > NeighborhoodIteratorType;
   radius.Fill( RadiusOfPatch );
-  typename InputImageType::RegionType SphereRegion;
-  typename InputImageType::IndexType   BeginningOfSphereRegion;
-  typename InputImageType::SizeType    SizeOfSphereRegion;
+  InputImageType::RegionType SphereRegion;
+  InputImageType::IndexType   BeginningOfSphereRegion;
+  InputImageType::SizeType    SizeOfSphereRegion;
   typedef itk::CovariantVector<RealType, Dimension>                               GradientPixelType;
   typedef itk::Image<GradientPixelType, Dimension>                                GradientImageType;
   typedef itk::SmartPointer<GradientImageType>                                    GradientImagePointer;
   typedef itk::GradientRecursiveGaussianImageFilter<InputImageType, GradientImageType> GradientImageFilterType;
-  typedef typename GradientImageFilterType::Pointer                               GradientImageFilterPointer;
+  typedef GradientImageFilterType::Pointer                               GradientImageFilterPointer;
   typedef itk::NeighborhoodIterator< GradientImageType >                          GradientNeighborhoodIteratorType; 
 
   RealType     GradientSigma = 1.0;
