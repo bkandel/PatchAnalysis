@@ -7,5 +7,6 @@ ELSE(ITK_FOUND)
   MESSAGE(FATAL_ERROR 
           "ITK not found. Please set ITK_DIR.")
 ENDIF(ITK_FOUND)
+PROJECT(PatchAnalysisProject)
 ADD_EXECUTABLE(PatchAnalysis PatchAnalysis.cxx)
 TARGET_LINK_LIBRARIES(PatchAnalysis ${ITK_LIBRARIES})

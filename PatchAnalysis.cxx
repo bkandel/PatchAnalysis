@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <sstream>
+#include <unistd.h>
 #include "itkImage.h"
 #include "itkImageFileReader.h"
 #include "itkImageFileWriter.h"
@@ -22,10 +23,94 @@
 #include "itkCovariantVector.h"
 #include "itkGradientRecursiveGaussianImageFilter.h"
 #include "itkBSplineInterpolateImageFunction.h"
+
+
 using namespace std; 
+
+void printHelp( void )
+{
+	cout << "COMMAND: " << endl;
+	cout << "    PatchAnalysis" << endl;
+	cout << "Learn dictionary of eigenpatches of an input image and output " << endl;
+	cout << "projection of every patch in image onto eigenpatches." << endl;
+	cout << "Inputs: " <<
+			"Image to use for learning eigenpatches and projecting onto eigenpatches." << endl;
+	cout << "Outputs:  Learned patches and projection images for all eigenpatches." << endl;
+	cout << endl;
+	cout << "OPTIONS:" << endl;
+	cout << "    -i <inputName> " << endl;
+	cout << "    -m <mask> " << endl;
+	cout << "    -p [prefix for patch image outputs]" << endl;
+	cout << "    -e [prefix for eigenvector image outputs]" << endl;
+	cout << "    -s [size of patches=3]" << endl;
+	cout << "    -t [target variance explained=0.95]" << endl;
+	cout << "    -v [verbosity=0]" << endl;
+	exit( EXIT_FAILURE );
+}
 
 int main(int argc, char * argv[] )
 {
+  struct args_t
+  {
+    string inputName;                // -i option
+    string maskName;                 // -m option
+    string outPatchName;             // -p option
+    string eigvecName;               // -e option
+    int patchSize;                  // -s option
+    double targetVarianceExplained; // -t option
+    int verbose;                    // -v option
+    int help;                       // -h option
+  } args;
+  args.inputName               = "";
+  args.maskName                = "";
+  args.outPatchName            = "";
+  args.eigvecName              = "";
+  args.patchSize               = 3;
+  args.targetVarianceExplained = 0.95;
+  args.verbose                 = 0;
+  args.help                    = 0;
+
+  const char * optString = "i:m:p:e:s:t:vh";
+  int opt = 0;
+  opt = getopt( argc, argv, optString );
+  while( opt != -1 )
+  {
+    switch( opt )
+    {
+    case 'i':
+    	args.inputName = optarg;
+    	break;
+    case 'm':
+    	args.maskName = optarg;
+    	break;
+    case 'p':
+    	args.outPatchName = optarg;
+    	break;
+    case 'e':
+    	args.eigvecName = optarg;
+    	break;
+    case 's':
+    	args.patchSize = atoi( optarg );
+    	break;
+    case 't':
+    	args.targetVarianceExplained = atof( optarg );
+    	break;
+    case 'v':
+    	args.verbose = atoi( optarg );
+    	break;
+    case 'h':
+    	printHelp();
+    	break;
+    default:
+    	printHelp();
+    	break;
+
+    }
+  }
+
+  cout << args.targetVarianceExplained << endl;
+  //printHelp();
+  return 0;
   if( argc < 9) 
   {
     cout << "Usage: " << argv[0] << 
