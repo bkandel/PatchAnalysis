@@ -7,6 +7,30 @@
 #include <itkImageRegionIterator.h>
 #include "itkNeighborhoodIterator.h"
 
+
+struct args_t
+{
+  std::string inputName;                // -i option
+  std::string maskName;                 // -m option
+  std::string outPatchName;             // -p option
+  std::string eigvecName;               // -e option
+  int patchSize;                  // -s option
+  double targetVarianceExplained; // -t option
+  int verbose;                    // -v option
+  int help;                       // -h option
+};
+
+template < class PixelType, const int dimension >
+void PatchAnalysis( args_t & args )
+{
+	std::cout << "Patch Analysis." << std::endl;
+}
+
+
+
+
+
+
 template <class TImage>
 bool IsInside( typename TImage::Pointer input, typename TImage::IndexType index )
 {

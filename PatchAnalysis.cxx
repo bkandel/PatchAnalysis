@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <iterator>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,21 +51,11 @@ void printHelp( void )
 
 int main(int argc, char * argv[] )
 {
-  struct args_t
-  {
-    string inputName;                // -i option
-    string maskName;                 // -m option
-    string outPatchName;             // -p option
-    string eigvecName;               // -e option
-    int patchSize;                  // -s option
-    double targetVarianceExplained; // -t option
-    int verbose;                    // -v option
-    int help;                       // -h option
-  } args;
+  args_t args;
   args.inputName               = "";
   args.maskName                = "";
-  args.outPatchName            = "";
-  args.eigvecName              = "";
+  args.outPatchName            = "patch_";
+  args.eigvecName              = "eigvec_";
   args.patchSize               = 3;
   args.targetVarianceExplained = 0.95;
   args.verbose                 = 0;
@@ -72,8 +63,7 @@ int main(int argc, char * argv[] )
 
   const char * optString = "i:m:p:e:s:t:vh";
   int opt = 0;
-  opt = getopt( argc, argv, optString );
-  while( opt != -1 )
+  while( (opt = getopt( argc, argv, optString)) != -1 )
   {
     switch( opt )
     {
@@ -102,22 +92,75 @@ int main(int argc, char * argv[] )
     	printHelp();
     	break;
     default:
+    	cout << "Error: Unrecognized command." << endl;
     	printHelp();
     	break;
-
     }
   }
 
-  cout << args.targetVarianceExplained << endl;
+  if( args.inputName.empty() || args.maskName.empty() )
+  {
+	  cout << "Error: Input image and mask name required." << endl;
+	  exit( EXIT_FAILURE ) ;
+  }
+  char inputNameChar[ args.inputName.size() + 1];
+  char maskNameChar[ args.maskName.size() + 1 ];
+  strcpy( inputNameChar, args.inputName.c_str() );
+  strcpy( maskNameChar, args.maskName.c_str() );
+  ifstream inputFile( inputNameChar );
+  if( !inputFile.good() )
+  {
+	  cout << "Error: Input image does not exist." << endl;
+	  exit( EXIT_FAILURE );
+  }
+  inputFile.close();
+  ifstream maskFile( maskNameChar );
+  if (!maskFile.good() )
+  {
+	  cout << "Error: Mask image does not exist." << endl;
+	  exit( EXIT_FAILURE );
+  }
+  maskFile.close();
+  itk::ImageIOBase::Pointer imageIO =
+		  itk::ImageIOFactory::CreateImageIO(args.inputName.c_str(),
+					itk::ImageIOFactory::ReadMode);
+  imageIO->SetFileName( args.inputName );
+  imageIO->ReadImageInformation();
+
+
+  const int inputDimension = imageIO->GetNumberOfDimensions();
+  typedef float InputPixelType;
+  switch( inputDimension )
+  {
+  case 2:
+	  PatchAnalysis< InputPixelType, 2 >( args );
+	  break;
+  case 3:
+	  PatchAnalysis< InputPixelType, 3 >( args );
+	  break;
+  case 4:
+	  PatchAnalysis< InputPixelType, 4 >( args );
+	  break;
+  default:
+	  cout << "Error: Dimension must be 2, 3, or 4." << endl;
+	  exit( EXIT_FAILURE );
+  }
+  if( args.verbose > 0 )
+  {
+	  cout << "Dimensionality is " << inputDimension << "." << endl;
+  }
+
+
   //printHelp();
   return 0;
+  /*
   if( argc < 9) 
   {
     cout << "Usage: " << argv[0] << 
        " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename SizeOfPatches TargetVarianceExplained" << endl; 
     return 1; 
   }
-  typedef double      InputPixelType; 
+  //typedef double      InputPixelType;
   typedef double      RealType; 
   const unsigned int  Dimension = 3; // assume 3d images
   const unsigned int  NumberOfPatches = 1000; 
@@ -736,6 +779,7 @@ int main(int argc, char * argv[] )
 //  modality2Mask  = MaskImage; // ditto
   // Count number of nonzero voxels in modality2Image
   // WARNING: ASSUMES MASK IS BINARY!!!
+  /*
   StatisticsFilter->SetInput( modality2MaskImage ); 
   StatisticsFilter->Update( ); 
   int sumOfModality2Mask = int( StatisticsFilter->GetSum( ) ); 
@@ -820,5 +864,6 @@ int main(int argc, char * argv[] )
   cout << "CorrCoef is " << correlationBetweenActualAndReconstructedImageModality2 << "." << endl;
 
 
-  return 0;   
+  return 0;
+  */
 }
