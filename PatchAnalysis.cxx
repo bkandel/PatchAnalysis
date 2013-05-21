@@ -51,7 +51,7 @@ void printHelp( void )
 
 int main(int argc, char * argv[] )
 {
-  args_t args;
+  ArgumentType args;
   args.inputName               = "";
   args.maskName                = "";
   args.outPatchName            = "patch_";
@@ -86,7 +86,7 @@ int main(int argc, char * argv[] )
     	args.targetVarianceExplained = atof( optarg );
     	break;
     case 'v':
-    	args.verbose = atoi( optarg );
+    	args.verbose = 1;
     	break;
     case 'h':
     	printHelp();
@@ -101,6 +101,7 @@ int main(int argc, char * argv[] )
   if( args.inputName.empty() || args.maskName.empty() )
   {
 	  cout << "Error: Input image and mask name required." << endl;
+	  cout << "For help, run " << argv[0] << " -h." << endl;
 	  exit( EXIT_FAILURE ) ;
   }
   char inputNameChar[ args.inputName.size() + 1];
@@ -129,6 +130,11 @@ int main(int argc, char * argv[] )
 
 
   const int inputDimension = imageIO->GetNumberOfDimensions();
+  if( args.verbose > 0 )
+  {
+	  cout << "Verbose output." << endl;
+	  cout << "Dimensionality is " << inputDimension << "." << endl;
+  }
   typedef float InputPixelType;
   switch( inputDimension )
   {
@@ -145,11 +151,6 @@ int main(int argc, char * argv[] )
 	  cout << "Error: Dimension must be 2, 3, or 4." << endl;
 	  exit( EXIT_FAILURE );
   }
-  if( args.verbose > 0 )
-  {
-	  cout << "Dimensionality is " << inputDimension << "." << endl;
-  }
-
 
   //printHelp();
   return 0;

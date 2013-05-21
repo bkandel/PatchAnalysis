@@ -8,7 +8,7 @@
 #include "itkNeighborhoodIterator.h"
 
 
-struct args_t
+struct ArgumentType
 {
   std::string inputName;                // -i option
   std::string maskName;                 // -m option
@@ -20,15 +20,83 @@ struct args_t
   int help;                       // -h option
 };
 
-template < class PixelType, const int dimension >
-void PatchAnalysis( args_t & args )
+template < class ImageType >
+class TPatchAnalysis
 {
-	std::cout << "Patch Analysis." << std::endl;
+public:
+	TPatchAnalysis( ArgumentType & );
+	void SetArguments( ArgumentType & );
+	void ReadInputImage( void );
+	void ReadMaskImage( void );
+	void GetSeedPoints( void );
+	void ExtractPatches( void );
+	void LearnEigenPatches( void );
+
+private:
+	ArgumentType args;
+	typename ImageType::Pointer inputImage;
+	typename ImageType::Pointer maskImage;
+};
+
+template < class ImageType >
+TPatchAnalysis< ImageType >::TPatchAnalysis( ArgumentType & inputArgs )
+{
+	SetArguments( inputArgs );
 }
 
+template < class ImageType >
+void TPatchAnalysis< ImageType >::SetArguments( ArgumentType & inputArgs)
+{
+	args = inputArgs;
+}
 
+template < class ImageType >
+void TPatchAnalysis< ImageType >::ReadInputImage()
+{
+	typedef itk::ImageFileReader< ImageType > ReaderType;
+	typename ReaderType::Pointer inputImageReader = ReaderType::New();
+    char inputNameChar[ args.inputName.size() + 1];
+    strcpy( inputNameChar, args.inputName.c_str() );
+    inputImageReader->SetFileName( inputNameChar );
+    try
+    {
+    	inputImageReader->Update();
+    }
+    catch( itk::ExceptionObject& )
+    {
+    	std::cout << "Could not read input image." << std::endl;
+    	exit( EXIT_FAILURE );
+    }
+    inputImage = inputImageReader->GetOutput();
+}
 
+template < class ImageType >
+void TPatchAnalysis< ImageType >::ReadMaskImage()
+{
+	typedef itk::ImageFileReader< ImageType > ReaderType;
+	typename ReaderType::Pointer maskImageReader = ReaderType::New();
+    char maskNameChar[ args.maskName.size() + 1];
+    strcpy( maskNameChar, args.maskName.c_str() );
+    maskImageReader->SetFileName( maskNameChar );
+    try
+    {
+    	maskImageReader->Update();
+    }
+    catch( itk::ExceptionObject& )
+    {
+    	std::cout << "Could not read mask image." << std::endl;
+    	exit( EXIT_FAILURE );
+    }
+    maskImage = maskImageReader->GetOutput();
+}
 
+template < class PixelType, const int dimension >
+void PatchAnalysis( ArgumentType & args )
+{
+	typedef itk::Image< PixelType, dimension > ImageType;
+	std::cout << "Patch Analysis." << std::endl;
+	TPatchAnalysis< ImageType > patchAnalysisObject( args );
+}
 
 
 template <class TImage>
