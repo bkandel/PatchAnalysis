@@ -143,6 +143,9 @@ private:
 	vnl_matrix< typename ImageType::PixelType > vectorizedPatchMatrix;
 	vnl_matrix< typename ImageType::PixelType > significantPatchEigenvectors;
 	int dimension;
+	vnl_matrix< typename ImageType::PixelType > patchesForAllPointsWithinMask;
+	long unsigned int numberOfVoxelsWithinMask;
+	vnl_matrix< typename ImageType::PixelType > eigenvectorCoefficients;
 };
 
 template < class ImageType >
@@ -361,7 +364,7 @@ void TPatchAnalysis< ImageType >::ExtractAllPatches()
 	std::vector< typename ImageType::IndexType > nonZeroMaskIndices;
 	typedef itk::ImageRegionIterator< ImageType > ImageIteratorType;
 	ImageIteratorType maskImageIterator( maskImage , maskImage->GetLargestPossibleRegion());
-	int maskImagePointIter = 0;
+	long unsigned int maskImagePointIter = 0;
 	for(maskImageIterator.GoToBegin(); !maskImageIterator.IsAtEnd(); ++maskImageIterator)
 	{
 		if( maskImageIterator.Get() >= 1 ) // threshold at 1
@@ -370,10 +373,11 @@ void TPatchAnalysis< ImageType >::ExtractAllPatches()
 			maskImagePointIter++;
 		}
 	}
-	if( args.verbose > 0 ) std::cout << "Number of points within mask is " << maskImagePointIter << std::endl;
+	numberOfVoxelsWithinMask = maskImagePointIter;
+	if( args.verbose > 0 ) std::cout << "Number of points within mask is " << numberOfVoxelsWithinMask << std::endl;
 
-	vnl_matrix< typename ImageType::PixelType > patchesForAllPointsWithinMask(
-			indicesWithinSphere.size(),  maskImagePointIter);
+	patchesForAllPointsWithinMask(
+			indicesWithinSphere.size(),  numberOfVoxelsWithinMask);
 	if( args.verbose > 0 )
 	{
 		std::cout << "PatchesForAllPointsWithinMask is " << patchesForAllPointsWithinMask.rows() << "x" <<
@@ -386,7 +390,7 @@ void TPatchAnalysis< ImageType >::ExtractAllPatches()
 	IteratorType iterator( radius, inputImage,
 			inputImage->GetRequestedRegion() );
 	patchesForAllPointsWithinMask.fill( 0 );
-	for( int i = 0; i < maskImagePointIter; ++i)
+	for( long unsigned int i = 0; i < numberOfVoxelsWithinMask; ++i)
 	{
 		patchIndex = nonZeroMaskIndices[ i ];
 		iterator.SetLocation( patchIndex );
@@ -402,7 +406,74 @@ void TPatchAnalysis< ImageType >::ExtractAllPatches()
 template< class ImageType >
 void TPatchAnalysis< ImageType >::ProjectOnEigenPatches()
 {
+	// perform regression from eigenvectors to images
+	// Ax = b, where A is eigenvector matrix (number of indices
+	// within patch x number of eigenvectors), x is coefficients
+	// (number of eigenvectors x 1), b is patch values for a given index
+	// (number of indices within patch x 1).
+	// output, eigenvectorCoefficients, is then number of eigenvectors
+	// x number of patches ('x' solutions for all patches).
+	if (args.verbose > 0 ) std::cout << "Computing regression." << std::endl;
+	eigenvectorCoefficients( significantPatchEigenvectors.columns(), numberOfVoxelsWithinMask );
+	eigenvectorCoefficients.fill( 0 );
+	vnl_svd< typename ImageType::PixelType > RegressionSVD(significantPatchEigenvectors);
+	//  EigenvectorCoefficients =  RegressionSVD.solve(PatchesForAllPointsWithinMask);
+	//  not feasible for large matrices
+	for( long unsigned int i = 0; i < numberOfVoxelsWithinMask; ++i)
+	{
+		vnl_vector< typename ImageType::PixelType > PatchOfInterest =
+				patchesForAllPointsWithinMask.get_column(i);
+		vnl_vector< typename ImageType::PixelType > x( significantPatchEigenvectors.columns() );
+		x.fill( 0 );
+		x = RegressionSVD.solve(PatchOfInterest);
+		eigenvectorCoefficients.set_column(i, x);
+	}
+	vnl_matrix< typename ImageType::PixelType > reconstructedPatches = significantPatchEigenvectors * eigenvectorCoefficients;
+	vnl_matrix< typename ImageType::PixelType > error = reconstructedPatches - patchesForAllPointsWithinMask;
+	vnl_vector< typename ImageType::PixelType > percentError(error.columns() );
+	for( int i = 0; i < error.columns(); ++i)
+	{
+		percentError(i) = error.get_column(i).two_norm() / (patchesForAllPointsWithinMask.get_column(i).two_norm() + 1e-10);
+	}
+	if( args.verbose > 0 )
+	{
+		std::cout << "Average percent error is " << percentError.mean() * 100 << "%, with max of " <<
+				percentError.max_value() * 100 << "%." <<  std::endl;
+	}
+}
 
+template < class ImageType >
+void TPatchAnalysis < ImageType >::WriteProjections()
+{
+	typedef typename itk::CSVNumericObjectFileWriter< typename ImageType::PixelType > CSVWriterType;
+	typename CSVWriterType::Pointer csvWriter = CSVWriterType::New();
+	std::vector< std::string > rowNames;
+	std::vector< std::string > columnNames;
+	for ( long unsigned int i = 0; i < numberOfVoxelsWithinMask; i++ )
+	{
+		std::string name = "Patch";
+		std::string imageIndex;
+		std::ostringstream convert;
+		convert << i;
+		imageIndex = convert.str();
+		name = name + imageIndex;
+		columnNames.push_back( name );
+	}
+	for( int i = 0; i < significantPatchEigenvectors.columns(); i++ )
+	{
+		std::string name = "ProjectionOfEigenvector";
+		std::string imageIndex;
+		std::ostringstream convert;
+		convert << i;
+		imageIndex = convert.str();
+		name = name + imageIndex;
+		rowNames.push_back( name );
+	}
+	csvWriter->SetFileName( args.outPatchName + ".csv" );
+	csvWriter->SetInput( &eigenvectorCoefficients );
+	csvWriter->SetColumnHeaders( columnNames );
+	csvWriter->SetRowHeaders( rowNames );
+	csvWriter->Update();
 }
 
 template < class PixelType, const int dimension >

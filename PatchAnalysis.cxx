@@ -55,7 +55,7 @@ int main(int argc, char * argv[] )
   ArgumentType args;
   args.inputName               = "";
   args.maskName                = "";
-  args.outPatchName            = "patch_";
+  args.outPatchName            = "projectedPatches";
   args.eigvecName              = "eigvec_";
   args.patchSize               = 3;
   args.targetVarianceExplained = 0.95;
