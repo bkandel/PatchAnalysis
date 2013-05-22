@@ -17,13 +17,14 @@
 #include <vnl/algo/vnl_svd.h>
 #include <itkStatisticsImageFilter.h>
 #include "itkImageRegionIterator.h"
-#include "PatchAnalysis.hxx"
-#include "PatchAnalysis.h"
 #include "itkLinearInterpolateImageFunction.h"
 #include "itkGradientImageFilter.h"
 #include "itkCovariantVector.h"
 #include "itkGradientRecursiveGaussianImageFilter.h"
 #include "itkBSplineInterpolateImageFunction.h"
+#include "PatchAnalysis.h"
+#include "PatchAnalysis.hxx"
+
 
 
 using namespace std; 

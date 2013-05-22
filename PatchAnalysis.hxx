@@ -7,25 +7,25 @@
 #include <itkImageRegionIterator.h>
 #include "itkNeighborhoodIterator.h"
 
-template< class InputImageType, class InputImage, class InputPixelType >
-typename InputImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< InputPixelType > &Vector,
-      typename InputImage::Pointer Mask)
+template< class ImageType >
+typename ImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< typename ImageType::PixelType > &Vector,
+      typename ImageType::Pointer Mask)
 {
-  typename InputImageType::Pointer VectorAsSpatialImage = InputImageType::New();
+  typename ImageType::Pointer VectorAsSpatialImage = ImageType::New();
   VectorAsSpatialImage->SetOrigin(Mask->GetOrigin() );
   VectorAsSpatialImage->SetSpacing( Mask->GetSpacing() );
   VectorAsSpatialImage->SetRegions( Mask->GetLargestPossibleRegion() );
   VectorAsSpatialImage->SetDirection( Mask-> GetDirection() );
   VectorAsSpatialImage->Allocate();
-  VectorAsSpatialImage->FillBuffer( itk::NumericTraits<InputPixelType>::Zero );
+  VectorAsSpatialImage->FillBuffer( itk::NumericTraits< typename ImageType::PixelType>::Zero );
   unsigned long VectorIndex = 0;
-  typedef itk::ImageRegionIteratorWithIndex<InputImage> IteratorType;
+  typedef itk::ImageRegionIteratorWithIndex< ImageType > IteratorType;
   IteratorType MaskIterator( Mask, Mask->GetLargestPossibleRegion() );
   for( MaskIterator.GoToBegin(); !MaskIterator.IsAtEnd(); ++MaskIterator)
   {
     if( MaskIterator.Get() >= 0.5 )
     {
-      InputPixelType Value = 0.0;
+      typename ImageType::PixelType Value = 0.0;
       if( VectorIndex < Vector.size() )
       {
 	Value = Vector(VectorIndex);
@@ -105,48 +105,6 @@ typename ImageType::Pointer GenerateMaskImageFromPatch(
 }
 
 
-struct ArgumentType
-{
-  std::string inputName;           // -i option
-  std::string maskName;            // -m option
-  std::string outPatchName;        // -p option
-  std::string eigvecName;          // -e option
-  int patchSize;                  // -s option
-  double targetVarianceExplained; // -t option
-  int numberOfSamplePatches;      // -n option
-  int verbose;                    // -v option
-  int help;                       // -h option
-};
-
-template < class ImageType >
-class TPatchAnalysis
-{
-public:
-	TPatchAnalysis( ArgumentType &, const int  );
-	void SetArguments( ArgumentType & );
-	void ReadInputImage( void );
-	void ReadMaskImage( void );
-	void GetSamplePatchLocations( void );
-	void ExtractSamplePatches( void );
-	void LearnEigenPatches( void );
-	void WriteEigenPatches( void );
-	void ExtractAllPatches( void );
-	void ProjectOnEigenPatches( void );
-	void WriteProjections( void );
-
-private:
-	ArgumentType args;
-	typename ImageType::Pointer inputImage;
-	typename ImageType::Pointer maskImage;
-	vnl_matrix < int > patchSeedPoints;
-	std::vector< unsigned int > indicesWithinSphere;
-	vnl_matrix< typename ImageType::PixelType > vectorizedPatchMatrix;
-	vnl_matrix< typename ImageType::PixelType > significantPatchEigenvectors;
-	int dimension;
-	vnl_matrix< typename ImageType::PixelType > patchesForAllPointsWithinMask;
-	long unsigned int numberOfVoxelsWithinMask;
-	vnl_matrix< typename ImageType::PixelType > eigenvectorCoefficients;
-};
 
 template < class ImageType >
 TPatchAnalysis< ImageType >::TPatchAnalysis( ArgumentType & inputArgs, int inputDimension )
@@ -346,8 +304,7 @@ void TPatchAnalysis< ImageType >::WriteEigenPatches()
 		std::ostringstream convert;
 		convert << ii;
 		std::string imageIndex = convert.str();
-		eigvecWriter->SetInput( ConvertVectorToSpatialImage< ImageType,
-				ImageType, double >( eigvec,
+		eigvecWriter->SetInput( ConvertVectorToSpatialImage< ImageType>( eigvec,
 						eigvecMaskImage) );
 		std::string eigvecFileName = args.eigvecName + ImageIndex + ".nii.gz" ;
 		eigvecWriter->SetFileName(eigvecFileName);
@@ -480,8 +437,17 @@ template < class PixelType, const int dimension >
 void PatchAnalysis( ArgumentType & args )
 {
 	typedef itk::Image< PixelType, dimension > ImageType;
-	std::cout << "Patch Analysis." << std::endl;
 	TPatchAnalysis< ImageType > patchAnalysisObject( args, dimension );
+	patchAnalysisObject.ReadInputImage( );
+	patchAnalysisObject.ReadMaskImage(  );
+	patchAnalysisObject.GetSamplePatchLocations( );
+	patchAnalysisObject.ExtractSamplePatches( );
+	patchAnalysisObject.LearnEigenPatches( );
+	if( !args.eigvecName.empty() )
+		patchAnalysisObject.WriteEigenPatches( );
+	patchAnalysisObject.ExtractAllPatches( );
+	patchAnalysisObject.ProjectOnEigenPatches( );
+	patchAnalysisObject.WriteProjections( );
 }
 
 
@@ -502,28 +468,6 @@ bool IsInside( typename TImage::Pointer input, typename TImage::IndexType index 
     }
   return isinside;
 }
-
-
-
-/*PatchAnalysisObject::PatchAnalysisObject ( 
-    double InputImage)
-{
-
-}
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 template< unsigned int ImageDimension, class TRealType, class TImageType, 
   class TGradientImageType, class TInterpolator > 
