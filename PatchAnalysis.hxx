@@ -7,15 +7,113 @@
 #include <itkImageRegionIterator.h>
 #include "itkNeighborhoodIterator.h"
 
+template< class InputImageType, class InputImage, class InputPixelType >
+typename InputImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< InputPixelType > &Vector,
+      typename InputImage::Pointer Mask)
+{
+  typename InputImageType::Pointer VectorAsSpatialImage = InputImageType::New();
+  VectorAsSpatialImage->SetOrigin(Mask->GetOrigin() );
+  VectorAsSpatialImage->SetSpacing( Mask->GetSpacing() );
+  VectorAsSpatialImage->SetRegions( Mask->GetLargestPossibleRegion() );
+  VectorAsSpatialImage->SetDirection( Mask-> GetDirection() );
+  VectorAsSpatialImage->Allocate();
+  VectorAsSpatialImage->FillBuffer( itk::NumericTraits<InputPixelType>::Zero );
+  unsigned long VectorIndex = 0;
+  typedef itk::ImageRegionIteratorWithIndex<InputImage> IteratorType;
+  IteratorType MaskIterator( Mask, Mask->GetLargestPossibleRegion() );
+  for( MaskIterator.GoToBegin(); !MaskIterator.IsAtEnd(); ++MaskIterator)
+  {
+    if( MaskIterator.Get() >= 0.5 )
+    {
+      InputPixelType Value = 0.0;
+      if( VectorIndex < Vector.size() )
+      {
+	Value = Vector(VectorIndex);
+      }
+      else
+      {
+	std::cout << "Size of mask does not match size of vector to be written!" << std::endl;
+	std::cout << "Exiting." << std::endl;
+	std::exception();
+      }
+      VectorAsSpatialImage->SetPixel(MaskIterator.GetIndex(), Value);
+      ++VectorIndex;
+    }
+    else
+    {
+      MaskIterator.Set( 0 );
+    }
+  }
+  return VectorAsSpatialImage;
+};
+
+
+template< class ImageType >
+typename ImageType::Pointer GenerateMaskImageFromPatch(
+    std::vector< unsigned int > &indicesWithinSphere,
+    const unsigned int radiusOfPatch,
+    const unsigned int dimension,
+    const unsigned int paddingVoxels = 2)
+{
+  int sizeOfImage = 2 * radiusOfPatch  + 2 *  paddingVoxels + 1;
+  typename ImageType::Pointer maskImage = ImageType::New();
+  typename ImageType::IndexType   start;
+  typename ImageType::IndexType   beginningOfSphereRegion;
+  typename ImageType::SizeType    sizeOfSphereRegion;
+  typename ImageType::SizeType    size;
+  typename ImageType::SpacingType spacing;
+  typename ImageType::PointType   originPoint;
+  typename ImageType::IndexType   originIndex;
+
+  for( int dd = 0; dd < dimension; dd++ )
+  {
+    start[ dd ]   = 0;
+    size[ dd ]    = sizeOfImage;
+    spacing[ dd ] = 1.0;
+    originPoint[ dd ] = originIndex[ dd ]  = 0.0;
+    beginningOfSphereRegion[ dd ] = paddingVoxels + radiusOfPatch; // one for each side--this is correct
+    sizeOfSphereRegion[ dd ] = radiusOfPatch * 2 + 1;
+  }
+  typename ImageType::RegionType region;
+  region.SetSize( size );
+  region.SetIndex( originIndex );
+  maskImage->SetRegions( region );
+  maskImage->Allocate( );
+  maskImage->SetSpacing( spacing );
+  maskImage->SetOrigin( originPoint );
+  typedef typename itk::ImageRegionIterator< ImageType > RegionIteratorType;
+  RegionIteratorType regionIterator( maskImage, region );
+  for ( regionIterator.GoToBegin(); !regionIterator.IsAtEnd(); ++regionIterator)
+  {
+    regionIterator.Set( 0.0 );
+  }
+  typename ImageType::RegionType sphereRegion;
+  sphereRegion.SetSize( sizeOfSphereRegion );
+  sphereRegion.SetIndex( beginningOfSphereRegion );
+  typedef itk::NeighborhoodIterator< ImageType > NeighborhoodIteratorType;
+  typename NeighborhoodIteratorType::RadiusType radius;
+  radius.Fill( radiusOfPatch );
+  NeighborhoodIteratorType SphereRegionIterator( radius, maskImage, sphereRegion );
+
+  typename ImageType::IndexType IndexWithinSphere;
+  for( unsigned int ii = 0; ii < indicesWithinSphere.size(); ii++)
+  {
+    SphereRegionIterator.SetPixel( indicesWithinSphere[ ii ],  1.0 );
+  }
+
+  return maskImage;
+}
+
 
 struct ArgumentType
 {
-  std::string inputName;                // -i option
-  std::string maskName;                 // -m option
-  std::string outPatchName;             // -p option
-  std::string eigvecName;               // -e option
+  std::string inputName;           // -i option
+  std::string maskName;            // -m option
+  std::string outPatchName;        // -p option
+  std::string eigvecName;          // -e option
   int patchSize;                  // -s option
   double targetVarianceExplained; // -t option
+  int numberOfSamplePatches;      // -n option
   int verbose;                    // -v option
   int help;                       // -h option
 };
@@ -24,24 +122,34 @@ template < class ImageType >
 class TPatchAnalysis
 {
 public:
-	TPatchAnalysis( ArgumentType & );
+	TPatchAnalysis( ArgumentType &, const int  );
 	void SetArguments( ArgumentType & );
 	void ReadInputImage( void );
 	void ReadMaskImage( void );
-	void GetSeedPoints( void );
-	void ExtractPatches( void );
+	void GetSamplePatchLocations( void );
+	void ExtractSamplePatches( void );
 	void LearnEigenPatches( void );
+	void WriteEigenPatches( void );
+	void ExtractAllPatches( void );
+	void ProjectOnEigenPatches( void );
+	void WriteProjections( void );
 
 private:
 	ArgumentType args;
 	typename ImageType::Pointer inputImage;
 	typename ImageType::Pointer maskImage;
+	vnl_matrix < int > patchSeedPoints;
+	std::vector< unsigned int > indicesWithinSphere;
+	vnl_matrix< typename ImageType::PixelType > vectorizedPatchMatrix;
+	vnl_matrix< typename ImageType::PixelType > significantPatchEigenvectors;
+	int dimension;
 };
 
 template < class ImageType >
-TPatchAnalysis< ImageType >::TPatchAnalysis( ArgumentType & inputArgs )
+TPatchAnalysis< ImageType >::TPatchAnalysis( ArgumentType & inputArgs, int inputDimension )
 {
 	SetArguments( inputArgs );
+	dimension = inputDimension;
 }
 
 template < class ImageType >
@@ -90,12 +198,219 @@ void TPatchAnalysis< ImageType >::ReadMaskImage()
     maskImage = maskImageReader->GetOutput();
 }
 
+
+template < class ImageType >
+void TPatchAnalysis< ImageType >::GetSamplePatchLocations()
+{
+	patchSeedPoints( args.numberOfSamplePatches , dimension );
+	vnl_vector< int > testPatchSeed( dimension );
+	int  patchSeedIterator = 0;
+	int  patchSeedAttemptIterator = 0;
+	typename ImageType::IndexType patchIndex;
+	typename ImageType::SizeType inputSize =
+			inputImage->GetLargestPossibleRegion().GetSize();
+	if( args.verbose > 0 )
+	{
+		std::cout << "Attempting to find seed points. Looking for " << args.numberOfSamplePatches <<
+				" points out of " << inputSize << " possible points." << std::endl;
+	}
+
+	srand( time( NULL) );
+	while( patchSeedIterator < args.numberOfSamplePatches )
+	{
+		for( int i = 0; i < dimension; ++i)
+		{
+			patchIndex[ i ] = testPatchSeed( i ) = rand() % inputSize[ i ];
+		}
+		if (maskImage->GetPixel( patchIndex ) >= 1 )
+		{
+			patchSeedPoints.set_row( patchSeedIterator, testPatchSeed );
+			++patchSeedIterator;
+		}
+		++patchSeedAttemptIterator;
+	}
+	if( args.verbose > 0)
+	{
+		std::cout << "Found " << patchSeedIterator <<
+				" points in " << patchSeedAttemptIterator <<
+				" attempts." << std::endl;
+	}
+}
+
+template < class ImageType >
+void TPatchAnalysis< ImageType >::ExtractSamplePatches()
+{
+	// allocate matrix based on radial size of patch
+	int i = 0 ;
+	typename ImageType::IndexType patchIndex;
+
+	for( int j = 0; j < dimension; ++j)
+	{
+		patchIndex[ j ] = patchSeedPoints( i, j );
+	}
+	typedef typename itk::NeighborhoodIterator< ImageType > IteratorType;
+	typename IteratorType::RadiusType radius;
+	radius.Fill( args.patchSize );
+	IteratorType Iterator( radius, inputImage,
+			inputImage->GetRequestedRegion() );
+	typedef typename ImageType::IndexType IndexType;
+	IndexType patchCenterIndex;
+	patchCenterIndex.Fill( args.patchSize ); // for finding indices within sphere, pick point far enough away from edges
+	Iterator.SetLocation( patchCenterIndex );
+
+	// get indices within N-d sphere
+	std::vector< double > weights;
+	for( int ii = 0; ii < Iterator.Size(); ++ii)
+	{
+		IndexType index = Iterator.GetIndex( ii );
+		float distanceFromPatchCenter = 0.0;
+		for( int jj = 0; jj < dimension; ++jj)
+		{
+			distanceFromPatchCenter +=
+					( index[jj] - patchCenterIndex[jj] ) *
+					( index[jj] - patchCenterIndex[jj] );
+		}
+		distanceFromPatchCenter = sqrt(distanceFromPatchCenter);
+		if( distanceFromPatchCenter <= args.patchSize )
+		{
+			indicesWithinSphere.push_back( ii );
+			weights.push_back( 1.0 );
+		}
+	}
+	std::cout << "Iterator.Size() is " << Iterator.Size() << std::endl;
+	std::cout << "IndicesWithinSphere.size() is " << indicesWithinSphere.size() << std::endl;
+
+	  // populate matrix with patch values from points in image
+	vectorizedPatchMatrix( args.numberOfSamplePatches , indicesWithinSphere.size() );
+	vectorizedPatchMatrix.fill( 0 );
+	for( int i = 0; i < args.numberOfSamplePatches ; ++i)
+	{
+		for( int j = 0; j < dimension; ++j)
+		{
+			patchCenterIndex[ j ] = patchSeedPoints( i, j );
+		}
+		Iterator.SetLocation( patchCenterIndex );
+		// get indices within N-d sphere
+		for( int j = 0; j < indicesWithinSphere.size(); ++j)
+		{
+			vectorizedPatchMatrix( i, j ) = Iterator.GetPixel( indicesWithinSphere[ j ] );
+		}
+	}
+}
+
+template < class ImageType >
+void TPatchAnalysis< ImageType >::LearnEigenPatches( void )
+{
+	vnl_svd< typename ImageType::PixelType > svd( vectorizedPatchMatrix );
+	vnl_matrix< typename ImageType::PixelType > patchEigenvectors = svd.V();
+    double sumOfEigenvalues = 0.0;
+    for( int i = 0; i < svd.rank(); i++)
+    {
+    	sumOfEigenvalues += svd.W(i, i);
+    }
+    double partialSumOfEigenvalues = 0.0;
+    double percentVarianceExplained = 0.0;
+	int  i = 0;
+	while( percentVarianceExplained < args.targetVarianceExplained && i < svd.rank())
+	{
+		partialSumOfEigenvalues += svd.W(i, i);
+	    percentVarianceExplained = partialSumOfEigenvalues /
+	                                      sumOfEigenvalues;
+	    i++;
+	}
+	int numberOfSignificantEigenvectors = i;
+	if( args.verbose > 0 )
+	{
+		std::cout << "It took " << numberOfSignificantEigenvectors << " eigenvectors to reach " <<
+				args.targetVarianceExplained * 100 << "% variance explained." << std::endl;
+	}
+	significantPatchEigenvectors = patchEigenvectors.get_n_columns(0, i);
+}
+
+template < class ImageType >
+void TPatchAnalysis< ImageType >::WriteEigenPatches()
+{
+	typedef itk::ImageFileWriter< ImageType > ImageWriterType;
+	typename ImageType::Pointer eigvecMaskImage;
+	eigvecMaskImage = GenerateMaskImageFromPatch< ImageType >(
+			indicesWithinSphere, args.patchSize, dimension);
+	typename ImageWriterType::Pointer eigvecWriter = ImageWriterType::New();
+	for ( unsigned int ii = 0; ii < significantPatchEigenvectors.columns() ; ii++)
+	{
+		vnl_vector< typename ImageType::PixelType > eigvec =
+				significantPatchEigenvectors.get_column( ii );
+		std::string ImageIndex;
+		std::ostringstream convert;
+		convert << ii;
+		std::string imageIndex = convert.str();
+		eigvecWriter->SetInput( ConvertVectorToSpatialImage< ImageType,
+				ImageType, double >( eigvec,
+						eigvecMaskImage) );
+		std::string eigvecFileName = args.eigvecName + ImageIndex + ".nii.gz" ;
+		eigvecWriter->SetFileName(eigvecFileName);
+		eigvecWriter->Update();
+	}
+}
+
+template < class ImageType >
+void TPatchAnalysis< ImageType >::ExtractAllPatches()
+{
+	// get indices of points within mask
+	typedef typename ImageType::IndexType IndexType;
+	IndexType patchIndex;
+	std::vector< typename ImageType::IndexType > nonZeroMaskIndices;
+	typedef itk::ImageRegionIterator< ImageType > ImageIteratorType;
+	ImageIteratorType maskImageIterator( maskImage , maskImage->GetLargestPossibleRegion());
+	int maskImagePointIter = 0;
+	for(maskImageIterator.GoToBegin(); !maskImageIterator.IsAtEnd(); ++maskImageIterator)
+	{
+		if( maskImageIterator.Get() >= 1 ) // threshold at 1
+		{
+			nonZeroMaskIndices.push_back( maskImageIterator.GetIndex() );
+			maskImagePointIter++;
+		}
+	}
+	if( args.verbose > 0 ) std::cout << "Number of points within mask is " << maskImagePointIter << std::endl;
+
+	vnl_matrix< typename ImageType::PixelType > patchesForAllPointsWithinMask(
+			indicesWithinSphere.size(),  maskImagePointIter);
+	if( args.verbose > 0 )
+	{
+		std::cout << "PatchesForAllPointsWithinMask is " << patchesForAllPointsWithinMask.rows() << "x" <<
+				patchesForAllPointsWithinMask.columns() << "." << std::endl;
+	}
+	// extract patches
+	typedef typename itk::NeighborhoodIterator< ImageType > IteratorType;
+	typename IteratorType::RadiusType radius;
+	radius.Fill( args.patchSize );
+	IteratorType iterator( radius, inputImage,
+			inputImage->GetRequestedRegion() );
+	patchesForAllPointsWithinMask.fill( 0 );
+	for( int i = 0; i < maskImagePointIter; ++i)
+	{
+		patchIndex = nonZeroMaskIndices[ i ];
+		iterator.SetLocation( patchIndex );
+		// get indices within N-d sphere
+		for( int j = 0; j < indicesWithinSphere.size(); ++j)
+		{
+			patchesForAllPointsWithinMask( j, i ) = iterator.GetPixel( indicesWithinSphere[ j ] );
+		}
+	}
+	if( args.verbose > 0 ) std::cout << "Recorded patches for all points." << std::endl;
+}
+
+template< class ImageType >
+void TPatchAnalysis< ImageType >::ProjectOnEigenPatches()
+{
+
+}
+
 template < class PixelType, const int dimension >
 void PatchAnalysis( ArgumentType & args )
 {
 	typedef itk::Image< PixelType, dimension > ImageType;
 	std::cout << "Patch Analysis." << std::endl;
-	TPatchAnalysis< ImageType > patchAnalysisObject( args );
+	TPatchAnalysis< ImageType > patchAnalysisObject( args, dimension );
 }
 
 
@@ -117,65 +432,7 @@ bool IsInside( typename TImage::Pointer input, typename TImage::IndexType index 
   return isinside;
 }
 
-template< class InputImageType,  class InputPixelType > 
-typename InputImageType::Pointer GenerateMaskImageFromPatch( 
-    std::vector< unsigned int > &IndicesWithinSphere, 
-    const unsigned int &RadiusOfPatch, 
-    const unsigned int &Dimension ) 
-{
-  int NumberOfPaddingVoxels = 2;  
-  int SizeOfImage = 2 * RadiusOfPatch  + 2 *  NumberOfPaddingVoxels + 1; 
-  typename InputImageType::Pointer MaskImage = InputImageType::New(); 
-  typename InputImageType::IndexType   start;
-  typename InputImageType::IndexType   BeginningOfSphereRegion; 
-  typename InputImageType::SizeType    SizeOfSphereRegion; 
-  typename InputImageType::SizeType    size;
-  typename InputImageType::SpacingType spacing; 
-  typename InputImageType::PointType   OriginPoint; 
-  typename InputImageType::IndexType   OriginIndex;
 
-  for( unsigned int dd = 0; dd < Dimension; dd++)
-  {
-    start[ dd ]   = 0; 
-    size[ dd ]    = SizeOfImage; 
-    spacing[ dd ] = 1.0; 
-    OriginPoint[ dd ] = OriginIndex[ dd ]  = 0.0; 
-    BeginningOfSphereRegion[ dd ] = NumberOfPaddingVoxels + RadiusOfPatch; // one for each side--this is correct
-    SizeOfSphereRegion[ dd ] = RadiusOfPatch * 2 + 1; 
-  }
-  typename InputImageType::RegionType region; 
-  region.SetSize( size ); 
-  region.SetIndex( OriginIndex ); 
-  MaskImage->SetRegions( region ); 
-  MaskImage->Allocate( ); 
-  MaskImage->SetSpacing( spacing ); 
-  MaskImage->SetOrigin( OriginPoint );
-  typedef typename itk::ImageRegionIterator< InputImageType > RegionIteratorType; 
-  RegionIteratorType RegionIterator( MaskImage, region );
-  for ( RegionIterator.GoToBegin(); !RegionIterator.IsAtEnd(); ++RegionIterator)
-  {
-    RegionIterator.Set( 0.0 ); 
-  }
-
-
-  typename InputImageType::RegionType SphereRegion; 
-  SphereRegion.SetSize( SizeOfSphereRegion ); 
-  SphereRegion.SetIndex( BeginningOfSphereRegion ); 
-  typedef itk::NeighborhoodIterator< InputImageType > NeighborhoodIteratorType;
-  typename NeighborhoodIteratorType::RadiusType radius;
-  radius.Fill( RadiusOfPatch );
-  NeighborhoodIteratorType SphereRegionIterator( radius, MaskImage, SphereRegion ); 
-  
-  typename InputImageType::IndexType IndexWithinSphere; 
-  for( unsigned int ii = 0; ii < IndicesWithinSphere.size(); ii++) 
-  {
-    SphereRegionIterator.SetPixel( IndicesWithinSphere[ ii ],  1.0 );
-    //std::cout << "Writing index " << ii << " which is " << IndicesWithinSphere[ ii ] << std::endl;
-  }
-
-  return MaskImage;
-
-}
 
 /*PatchAnalysisObject::PatchAnalysisObject ( 
     double InputImage)
@@ -195,45 +452,7 @@ typename InputImageType::Pointer GenerateMaskImageFromPatch(
 
 
 
-template< class InputImageType, class InputImage, class InputPixelType >
-typename InputImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< InputPixelType > &Vector, 
-      typename InputImage::Pointer Mask)
-{
-  typename InputImageType::Pointer VectorAsSpatialImage = InputImageType::New(); 
-  VectorAsSpatialImage->SetOrigin(Mask->GetOrigin() );
-  VectorAsSpatialImage->SetSpacing( Mask->GetSpacing() ); 
-  VectorAsSpatialImage->SetRegions( Mask->GetLargestPossibleRegion() ); 
-  VectorAsSpatialImage->SetDirection( Mask-> GetDirection() ); 
-  VectorAsSpatialImage->Allocate(); 
-  VectorAsSpatialImage->FillBuffer( itk::NumericTraits<InputPixelType>::Zero ); 
-  unsigned long VectorIndex = 0; 
-  typedef itk::ImageRegionIteratorWithIndex<InputImage> IteratorType; 
-  IteratorType MaskIterator( Mask, Mask->GetLargestPossibleRegion() );
-  for( MaskIterator.GoToBegin(); !MaskIterator.IsAtEnd(); ++MaskIterator)
-  {
-    if( MaskIterator.Get() >= 0.5 )
-    {
-      InputPixelType Value = 0.0; 
-      if( VectorIndex < Vector.size() )
-      {
-	Value = Vector(VectorIndex); 
-      }
-      else
-      {
-	std::cout << "Size of mask does not match size of vector to be written!" << std::endl;
-	std::cout << "Exiting." << std::endl;
-	std::exception(); 
-      }
-      VectorAsSpatialImage->SetPixel(MaskIterator.GetIndex(), Value); 
-      ++VectorIndex; 
-    }
-    else
-    {
-      MaskIterator.Set( 0 ); 
-    }
-  }
-  return VectorAsSpatialImage;
-};
+
 
 template< unsigned int ImageDimension, class TRealType, class TImageType, 
   class TGradientImageType, class TInterpolator > 

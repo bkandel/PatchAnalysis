@@ -42,10 +42,11 @@ void printHelp( void )
 	cout << "    -i <inputName> " << endl;
 	cout << "    -m <mask> " << endl;
 	cout << "    -p [prefix for patch image outputs]" << endl;
-	cout << "    -e [prefix for eigenvector image outputs]" << endl;
+	cout << "    -e [prefix for eigenvector image outputs]  If not set, eigenvectors are not written." << endl;
 	cout << "    -s [size of patches=3]" << endl;
 	cout << "    -t [target variance explained=0.95]" << endl;
-	cout << "    -v [verbosity=0]" << endl;
+	cout << "    -n [number of sample patches to take=1000]" << endl;
+	cout << "    -v print verbose output" << endl;
 	exit( EXIT_FAILURE );
 }
 
@@ -58,6 +59,7 @@ int main(int argc, char * argv[] )
   args.eigvecName              = "eigvec_";
   args.patchSize               = 3;
   args.targetVarianceExplained = 0.95;
+  args.numberOfSamplePatches   = 1000;
   args.verbose                 = 0;
   args.help                    = 0;
 
@@ -84,6 +86,9 @@ int main(int argc, char * argv[] )
     	break;
     case 't':
     	args.targetVarianceExplained = atof( optarg );
+    	break;
+    case 'n':
+    	args.numberOfSamplePatches = atoi( optarg );
     	break;
     case 'v':
     	args.verbose = 1;
@@ -155,22 +160,14 @@ int main(int argc, char * argv[] )
   //printHelp();
   return 0;
   /*
-  if( argc < 9) 
-  {
-    cout << "Usage: " << argv[0] << 
-       " InputFilename MaskFilename VectorizedPatchFilename EigenvectorFilename SizeOfPatches TargetVarianceExplained" << endl; 
-    return 1; 
-  }
-  //typedef double      InputPixelType;
-  typedef double      RealType; 
+
   const unsigned int  Dimension = 3; // assume 3d images
   const unsigned int  NumberOfPatches = 1000; 
 
   typedef itk::Image< InputPixelType, Dimension >   InputImageType;
   typedef InputImageType::PointType   PointType; 
 
-  InputImageType::Pointer InputImage;
-  InputImageType::Pointer MaskImage;  
+
   InputImageType::Pointer PatchImage; 
   InputImageType::Pointer modality2Image; 
   InputImageType::Pointer modality2MaskImage; 
@@ -181,11 +178,6 @@ int main(int argc, char * argv[] )
   ReaderType::Pointer  modality2ImageReader = ReaderType::New(); 
   ReaderType::Pointer  modality2MaskReader  = ReaderType::New(); 
 
-  const char * inputFilename            = argv[1];
-  const char * maskFilename             = argv[2]; 
-  const char * outputFilename           = argv[3];
-  const char * eigvecFilename           = argv[4]; 
-  const unsigned int  SizeOfPatches     = atoi(argv[ 5 ]);
   const unsigned int  VolumeOfPatches   = pow(double( SizeOfPatches ), 
       static_cast< int > (Dimension) ); //49; //343; // illegal: pow(SizeOfPatches, Dimension);  
   double TargetPercentVarianceExplained = atof( argv[ 6 ] ); 
@@ -347,7 +339,7 @@ int main(int argc, char * argv[] )
   StatisticsFilter->Update(); 
   int SumOfMaskImage = int( StatisticsFilter->GetSum() ); 
   cout << "Total number of possible points: " << SumOfMaskImage << "." << endl;
-  vnl_matrix< int > NonZeroMaskIndices( SumOfMaskImage, Dimension ); 
+  vnl_matrix< int > NonZeroMaskIndices( SumOfMaskImage, Dimension );
   typedef  itk::ImageRegionIterator< InputImageType > ImageIteratorType; 
   ImageIteratorType MaskImageIterator( MaskImage , MaskImage->GetLargestPossibleRegion());
   
