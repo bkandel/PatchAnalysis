@@ -163,7 +163,7 @@ void TPatchAnalysis< ImageType >::ReadMaskImage()
 template < class ImageType >
 void TPatchAnalysis< ImageType >::GetSamplePatchLocations()
 {
-	patchSeedPoints( args.numberOfSamplePatches , dimension );
+	patchSeedPoints.set_size( args.numberOfSamplePatches , dimension );
 	vnl_vector< int > testPatchSeed( dimension );
 	int  patchSeedIterator = 0;
 	int  patchSeedAttemptIterator = 0;
@@ -242,7 +242,7 @@ void TPatchAnalysis< ImageType >::ExtractSamplePatches()
 	std::cout << "IndicesWithinSphere.size() is " << indicesWithinSphere.size() << std::endl;
 
 	  // populate matrix with patch values from points in image
-	vectorizedPatchMatrix( args.numberOfSamplePatches , indicesWithinSphere.size() );
+	vectorizedPatchMatrix.set_size( args.numberOfSamplePatches , indicesWithinSphere.size() );
 	vectorizedPatchMatrix.fill( 0 );
 	for( int i = 0; i < args.numberOfSamplePatches ; ++i)
 	{
@@ -285,6 +285,7 @@ void TPatchAnalysis< ImageType >::LearnEigenPatches( void )
 		std::cout << "It took " << numberOfSignificantEigenvectors << " eigenvectors to reach " <<
 				args.targetVarianceExplained * 100 << "% variance explained." << std::endl;
 	}
+	significantPatchEigenvectors.set_size( patchEigenvectors.rows(), i);
 	significantPatchEigenvectors = patchEigenvectors.get_n_columns(0, i);
 }
 
@@ -333,7 +334,7 @@ void TPatchAnalysis< ImageType >::ExtractAllPatches()
 	numberOfVoxelsWithinMask = maskImagePointIter;
 	if( args.verbose > 0 ) std::cout << "Number of points within mask is " << numberOfVoxelsWithinMask << std::endl;
 
-	patchesForAllPointsWithinMask(
+	patchesForAllPointsWithinMask.set_size(
 			indicesWithinSphere.size(),  numberOfVoxelsWithinMask);
 	if( args.verbose > 0 )
 	{
@@ -371,7 +372,7 @@ void TPatchAnalysis< ImageType >::ProjectOnEigenPatches()
 	// output, eigenvectorCoefficients, is then number of eigenvectors
 	// x number of patches ('x' solutions for all patches).
 	if (args.verbose > 0 ) std::cout << "Computing regression." << std::endl;
-	eigenvectorCoefficients( significantPatchEigenvectors.columns(), numberOfVoxelsWithinMask );
+	eigenvectorCoefficients.set_size( significantPatchEigenvectors.columns(), numberOfVoxelsWithinMask );
 	eigenvectorCoefficients.fill( 0 );
 	vnl_svd< typename ImageType::PixelType > RegressionSVD(significantPatchEigenvectors);
 	//  EigenvectorCoefficients =  RegressionSVD.solve(PatchesForAllPointsWithinMask);
@@ -406,6 +407,7 @@ void TPatchAnalysis < ImageType >::WriteProjections()
 	typename CSVWriterType::Pointer csvWriter = CSVWriterType::New();
 	std::vector< std::string > rowNames;
 	std::vector< std::string > columnNames;
+	columnNames.push_back(""); // first column name must be blank
 	for ( long unsigned int i = 0; i < numberOfVoxelsWithinMask; i++ )
 	{
 		std::string name = "Patch";
@@ -426,6 +428,7 @@ void TPatchAnalysis < ImageType >::WriteProjections()
 		name = name + imageIndex;
 		rowNames.push_back( name );
 	}
+
 	csvWriter->SetFileName( args.outPatchName + ".csv" );
 	csvWriter->SetInput( &eigenvectorCoefficients );
 	csvWriter->SetColumnHeaders( columnNames );
