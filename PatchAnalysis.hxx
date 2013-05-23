@@ -70,7 +70,7 @@ typename ImageType::Pointer GenerateMaskImageFromPatch(
     start[ dd ]   = 0;
     size[ dd ]    = sizeOfImage;
     spacing[ dd ] = 1.0;
-    originPoint[ dd ] = originIndex[ dd ]  = 0.0;
+    originPoint[ dd ] = originIndex[ dd ]  = 0;
     beginningOfSphereRegion[ dd ] = paddingVoxels + radiusOfPatch; // one for each side--this is correct
     sizeOfSphereRegion[ dd ] = radiusOfPatch * 2 + 1;
   }
