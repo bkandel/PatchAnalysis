@@ -301,13 +301,12 @@ void TPatchAnalysis< ImageType >::WriteEigenPatches()
 	{
 		vnl_vector< typename ImageType::PixelType > eigvec =
 				significantPatchEigenvectors.get_column( ii );
-		std::string ImageIndex;
 		std::ostringstream convert;
 		convert << ii;
 		std::string imageIndex = convert.str();
 		eigvecWriter->SetInput( ConvertVectorToSpatialImage< ImageType>( eigvec,
 						eigvecMaskImage) );
-		std::string eigvecFileName = args.eigvecName + ImageIndex + ".nii.gz" ;
+		std::string eigvecFileName = args.eigvecName + imageIndex + ".nii.gz" ;
 		eigvecWriter->SetFileName(eigvecFileName);
 		eigvecWriter->Update();
 	}
