@@ -47,6 +47,7 @@ void printHelp( void )
 	cout << "    -s [size of patches=3]" << endl;
 	cout << "    -t [target variance explained=0.95]" << endl;
 	cout << "    -n [number of sample patches to take=1000]" << endl;
+	cout << "    -o compute orientation invariant eigenvectors and projections" << endl;
 	cout << "    -v print verbose output" << endl;
 	exit( EXIT_FAILURE );
 }
@@ -62,9 +63,10 @@ int main(int argc, char * argv[] )
   args.targetVarianceExplained = 0.95;
   args.numberOfSamplePatches   = 1000;
   args.verbose                 = 0;
+  args.orientationInvariant    = false;
   args.help                    = 0;
 
-  const char * optString = "i:m:p:e:s:t:vh";
+  const char * optString = "i:m:p:e:s:t:voh";
   int opt = 0;
   while( (opt = getopt( argc, argv, optString)) != -1 )
   {
@@ -93,6 +95,9 @@ int main(int argc, char * argv[] )
     	break;
     case 'v':
     	args.verbose = 1;
+    	break;
+    case 'o':
+    	args.orientationInvariant = true;
     	break;
     case 'h':
     	printHelp();

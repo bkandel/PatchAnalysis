@@ -51,9 +51,9 @@ typename ImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< typename Im
 template< class ImageType >
 typename ImageType::Pointer GenerateMaskImageFromPatch(
     std::vector< unsigned int > &indicesWithinSphere,
-    const unsigned int radiusOfPatch,
-    const unsigned int dimension,
-    const unsigned int paddingVoxels = 2)
+    int &radiusOfPatch,
+    const  int dimension,
+    const  int paddingVoxels = 2)
 {
   int sizeOfImage = 2 * radiusOfPatch  + 2 *  paddingVoxels + 1;
   typename ImageType::Pointer maskImage = ImageType::New();
@@ -106,21 +106,24 @@ typename ImageType::Pointer GenerateMaskImageFromPatch(
 
 
 
-template < class ImageType >
-TPatchAnalysis< ImageType >::TPatchAnalysis( ArgumentType & inputArgs, int inputDimension )
+template < class ImageType, const int dimension >
+TPatchAnalysis< ImageType, dimension >::TPatchAnalysis( ArgumentType & inputArgs)
 {
 	SetArguments( inputArgs );
-	dimension = inputDimension;
+	this->paddingVoxels = 2;
+	/*
+	 * TODO: initialize mask for patches, patch iterator, etc.
+	 */
 }
 
-template < class ImageType >
-void TPatchAnalysis< ImageType >::SetArguments( ArgumentType & inputArgs)
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::SetArguments( ArgumentType & inputArgs)
 {
 	args = inputArgs;
 }
 
-template < class ImageType >
-void TPatchAnalysis< ImageType >::ReadInputImage()
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::ReadInputImage()
 {
 	typedef itk::ImageFileReader< ImageType > ReaderType;
 	typename ReaderType::Pointer inputImageReader = ReaderType::New();
@@ -139,8 +142,8 @@ void TPatchAnalysis< ImageType >::ReadInputImage()
     inputImage = inputImageReader->GetOutput();
 }
 
-template < class ImageType >
-void TPatchAnalysis< ImageType >::ReadMaskImage()
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::ReadMaskImage()
 {
 	typedef itk::ImageFileReader< ImageType > ReaderType;
 	typename ReaderType::Pointer maskImageReader = ReaderType::New();
@@ -160,8 +163,8 @@ void TPatchAnalysis< ImageType >::ReadMaskImage()
 }
 
 
-template < class ImageType >
-void TPatchAnalysis< ImageType >::GetSamplePatchLocations()
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::GetSamplePatchLocations()
 {
 	patchSeedPoints.set_size( args.numberOfSamplePatches , dimension );
 	vnl_vector< int > testPatchSeed( dimension );
@@ -198,8 +201,8 @@ void TPatchAnalysis< ImageType >::GetSamplePatchLocations()
 	}
 }
 
-template < class ImageType >
-void TPatchAnalysis< ImageType >::ExtractSamplePatches()
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::ExtractSamplePatches()
 {
 	// allocate matrix based on radial size of patch
 	int i = 0 ;
@@ -220,7 +223,6 @@ void TPatchAnalysis< ImageType >::ExtractSamplePatches()
 	Iterator.SetLocation( patchCenterIndex );
 
 	// get indices within N-d sphere
-	std::vector< double > weights;
 	for( int ii = 0; ii < Iterator.Size(); ++ii)
 	{
 		IndexType index = Iterator.GetIndex( ii );
@@ -235,15 +237,16 @@ void TPatchAnalysis< ImageType >::ExtractSamplePatches()
 		if( distanceFromPatchCenter <= args.patchSize )
 		{
 			indicesWithinSphere.push_back( ii );
-			weights.push_back( 1.0 );
+			this->weights.push_back( 1.0 );
 		}
 	}
 	std::cout << "Iterator.Size() is " << Iterator.Size() << std::endl;
 	std::cout << "IndicesWithinSphere.size() is " << indicesWithinSphere.size() << std::endl;
 
 	  // populate matrix with patch values from points in image
-	vectorizedPatchMatrix.set_size( args.numberOfSamplePatches , indicesWithinSphere.size() );
-	vectorizedPatchMatrix.fill( 0 );
+	this->vectorizedSamplePatchMatrix.set_size(
+			args.numberOfSamplePatches , indicesWithinSphere.size() );
+	this->vectorizedSamplePatchMatrix.fill( 0 );
 	for( int i = 0; i < args.numberOfSamplePatches ; ++i)
 	{
 		for( int j = 0; j < dimension; ++j)
@@ -254,15 +257,16 @@ void TPatchAnalysis< ImageType >::ExtractSamplePatches()
 		// get indices within N-d sphere
 		for( int j = 0; j < indicesWithinSphere.size(); ++j)
 		{
-			vectorizedPatchMatrix( i, j ) = Iterator.GetPixel( indicesWithinSphere[ j ] );
+			this->vectorizedSamplePatchMatrix( i, j ) =
+					Iterator.GetPixel( indicesWithinSphere[ j ] );
 		}
 	}
 }
 
-template < class ImageType >
-void TPatchAnalysis< ImageType >::LearnEigenPatches( void )
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::LearnEigenPatches( void )
 {
-	vnl_svd< typename ImageType::PixelType > svd( vectorizedPatchMatrix );
+	vnl_svd< typename ImageType::PixelType > svd( vectorizedSamplePatchMatrix );
 	vnl_matrix< typename ImageType::PixelType > patchEigenvectors = svd.V();
     double sumOfEigenvalues = 0.0;
     for( int i = 0; i < svd.rank(); i++)
@@ -289,8 +293,8 @@ void TPatchAnalysis< ImageType >::LearnEigenPatches( void )
 	significantPatchEigenvectors = patchEigenvectors.get_n_columns(0, i);
 }
 
-template < class ImageType >
-void TPatchAnalysis< ImageType >::WriteEigenPatches()
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::WriteEigenPatches()
 {
 	typedef itk::ImageFileWriter< ImageType > ImageWriterType;
 	typename ImageType::Pointer eigvecMaskImage;
@@ -312,8 +316,8 @@ void TPatchAnalysis< ImageType >::WriteEigenPatches()
 	}
 }
 
-template < class ImageType >
-void TPatchAnalysis< ImageType >::ExtractAllPatches()
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::ExtractAllPatches()
 {
 	// get indices of points within mask
 	typedef typename ImageType::IndexType IndexType;
@@ -360,8 +364,166 @@ void TPatchAnalysis< ImageType >::ExtractAllPatches()
 	if( args.verbose > 0 ) std::cout << "Recorded patches for all points." << std::endl;
 }
 
-template< class ImageType >
-void TPatchAnalysis< ImageType >::ProjectOnEigenPatches()
+template< class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::ReorientSamplePatches()
+{
+	typedef itk::NeighborhoodIterator< ImageType >                     NeighborhoodIteratorType;
+	typedef typename itk::CovariantVector< typename ImageType::PixelType,
+			dimension>                                                  GradientPixelType;
+	typedef typename itk::Image< GradientPixelType, dimension >       GradientImageType;
+	typedef typename itk::GradientRecursiveGaussianImageFilter< ImageType,
+			GradientImageType >                                          GradientImageFilterType;
+	typedef typename GradientImageFilterType::Pointer                  GradientImageFilterPointer;
+	typedef typename itk::NeighborhoodIterator< GradientImageType >    GradientNeighborhoodIteratorType;
+	typedef typename itk::LinearInterpolateImageFunction< ImageType,
+			typename ImageType::PixelType>                             ScalarInterpolatorType;
+	typedef typename itk::SmartPointer< GradientImageType >            GradientImagePointer;
+	typedef typename ScalarInterpolatorType::Pointer                   InterpPointer;
+
+	typename ImageType::RegionType               sphereRegion;
+	typename ImageType::IndexType                beginningOfSphereRegion;
+	typename ImageType::SizeType                 sizeOfSphereRegion;
+	float gradientSigma =                          1.0;
+	typename NeighborhoodIteratorType::RadiusType radius;
+
+	GradientImageFilterPointer    movingGradientFilter = GradientImageFilterType::New();
+	GradientImageFilterPointer    fixedGradientFilter =  GradientImageFilterType::New();
+	InterpPointer interp1 = ScalarInterpolatorType::New();
+
+	radius.Fill( this->args.patchSize );
+	for( int ii = 0; ii < dimension; ii++)
+	{
+		beginningOfSphereRegion[ii] = this->paddingVoxels + this->args.patchSize;
+		sizeOfSphereRegion[ii]      = this->args.patchSize * 2 + 1;
+	}
+	sphereRegion.SetSize( sizeOfSphereRegion );
+	sphereRegion.SetIndex( beginningOfSphereRegion );
+
+	typename ImageType::Pointer eigenvecMaskImage;
+	eigenvecMaskImage = GenerateMaskImageFromPatch< ImageType >(
+			this->indicesWithinSphere, this->args.patchSize, dimension, this->paddingVoxels);
+	//NeighborhoodIteratorType regionIterator()
+	vnl_vector< typename ImageType::PixelType > canonicalEigenPatchAsVector =
+			this->significantPatchEigenvectors.get_column(1);
+	// the SECOND eigenvector is canonical--1st is constant
+	this->canonicalFrame = ConvertVectorToSpatialImage< ImageType >(
+			canonicalEigenPatchAsVector, eigenvecMaskImage );
+	NeighborhoodIteratorType fixedIterator(radius, canonicalFrame, sphereRegion);
+	// compute gradient of canonical frame once, outside the loop
+	fixedGradientFilter->SetInput(canonicalFrame);
+	fixedGradientFilter->SetSigma(gradientSigma);
+	fixedGradientFilter->Update();
+	typename GradientImageType::Pointer fixedGradientImage = fixedGradientFilter->GetOutput();
+
+	for( long int ii = 0; ii < this->vectorizedSamplePatchMatrix.rows(); ii++)
+	{
+		vnl_vector< typename ImageType::PixelType > vectorizedPatch =
+				this->vectorizedSamplePatchMatrix.get_row(ii);
+		typename ImageType::Pointer movingImage = ConvertVectorToSpatialImage< ImageType >(
+				vectorizedPatch, eigenvecMaskImage);
+		NeighborhoodIteratorType movingIterator(radius, movingImage, sphereRegion);
+		movingGradientFilter->SetInput(movingImage);
+		movingGradientFilter->SetSigma(gradientSigma);
+		movingGradientFilter->Update();
+		typename GradientImageType::Pointer movingGradientImage = movingGradientFilter->GetOutput();
+		vnl_vector< typename ImageType::PixelType > rotatedPatchAsVector =
+				ReorientPatchToReferenceFrame< dimension, typename ImageType::PixelType,
+				ImageType, GradientImageType, InterpPointer> (
+						fixedIterator, movingIterator, eigenvecMaskImage,
+						this->indicesWithinSphere,
+						this->weights,
+						fixedGradientImage,
+						movingGradientImage,
+						dimension,
+						interp1);
+		std::cout << " rotated like a banshee " << std::endl;
+		this->vectorizedSamplePatchMatrix.set_row(ii, rotatedPatchAsVector);
+
+
+	}
+}
+
+template< class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::ReorientAllPatches()
+{
+	typedef itk::NeighborhoodIterator< ImageType >                     NeighborhoodIteratorType;
+	typedef typename itk::CovariantVector< typename ImageType::PixelType,
+			dimension>                                                  GradientPixelType;
+	typedef typename itk::Image< GradientPixelType, dimension >       GradientImageType;
+	typedef typename itk::GradientRecursiveGaussianImageFilter< ImageType,
+			GradientImageType >                                          GradientImageFilterType;
+	typedef typename GradientImageFilterType::Pointer                  GradientImageFilterPointer;
+	typedef typename itk::NeighborhoodIterator< GradientImageType >    GradientNeighborhoodIteratorType;
+	typedef typename itk::LinearInterpolateImageFunction< ImageType,
+			typename ImageType::PixelType>                             ScalarInterpolatorType;
+	typedef typename itk::SmartPointer< GradientImageType >            GradientImagePointer;
+	typedef typename ScalarInterpolatorType::Pointer                   InterpPointer;
+
+	typename ImageType::RegionType               sphereRegion;
+	typename ImageType::IndexType                beginningOfSphereRegion;
+	typename ImageType::SizeType                 sizeOfSphereRegion;
+	float gradientSigma =                          1.0;
+	typename NeighborhoodIteratorType::RadiusType radius;
+
+	GradientImageFilterPointer    movingGradientFilter = GradientImageFilterType::New();
+	GradientImageFilterPointer    fixedGradientFilter =  GradientImageFilterType::New();
+	InterpPointer interp1 = ScalarInterpolatorType::New();
+
+	radius.Fill( this->args.patchSize );
+	for( int ii = 0; ii < dimension; ii++)
+	{
+		beginningOfSphereRegion[ii] = this->paddingVoxels + this->args.patchSize;
+		sizeOfSphereRegion[ii]      = this->args.patchSize * 2 + 1;
+	}
+	sphereRegion.SetSize( sizeOfSphereRegion );
+	sphereRegion.SetIndex( beginningOfSphereRegion );
+
+	typename ImageType::Pointer eigenvecMaskImage;
+	eigenvecMaskImage = GenerateMaskImageFromPatch< ImageType >(
+			this->indicesWithinSphere, this->args.patchSize, dimension, this->paddingVoxels);
+	//NeighborhoodIteratorType regionIterator()
+	vnl_vector< typename ImageType::PixelType > canonicalEigenPatchAsVector =
+			this->significantPatchEigenvectors.get_column(1);
+	// the SECOND eigenvector is canonical--1st is constant
+	this->canonicalFrame = ConvertVectorToSpatialImage< ImageType >(
+			canonicalEigenPatchAsVector, eigenvecMaskImage );
+	NeighborhoodIteratorType fixedIterator(radius, canonicalFrame, sphereRegion);
+	// compute gradient of canonical frame once, outside the loop
+	fixedGradientFilter->SetInput(canonicalFrame);
+	fixedGradientFilter->SetSigma(gradientSigma);
+	fixedGradientFilter->Update();
+	typename GradientImageType::Pointer fixedGradientImage = fixedGradientFilter->GetOutput();
+
+	for( long int ii = 0; ii < this->patchesForAllPointsWithinMask.rows(); ii++)
+	{
+		vnl_vector< typename ImageType::PixelType > vectorizedPatch =
+				this->patchesForAllPointsWithinMask.get_row(ii);
+		typename ImageType::Pointer movingImage = ConvertVectorToSpatialImage< ImageType >(
+				vectorizedPatch, eigenvecMaskImage);
+		NeighborhoodIteratorType movingIterator(radius, movingImage, sphereRegion);
+		movingGradientFilter->SetInput(movingImage);
+		movingGradientFilter->SetSigma(gradientSigma);
+		movingGradientFilter->Update();
+		typename GradientImageType::Pointer movingGradientImage = movingGradientFilter->GetOutput();
+		vnl_vector< typename ImageType::PixelType > rotatedPatchAsVector =
+				ReorientPatchToReferenceFrame< dimension, typename ImageType::PixelType,
+				ImageType, GradientImageType, InterpPointer> (
+						fixedIterator, movingIterator, eigenvecMaskImage,
+						this->indicesWithinSphere,
+						this->weights,
+						fixedGradientImage,
+						movingGradientImage,
+						dimension,
+						interp1);
+		this->patchesForAllPointsWithinMask.set_row(ii, rotatedPatchAsVector);
+
+
+	}
+}
+
+
+template< class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::ProjectOnEigenPatches()
 {
 	// perform regression from eigenvectors to images
 	// Ax = b, where A is eigenvector matrix (number of indices
@@ -399,8 +561,8 @@ void TPatchAnalysis< ImageType >::ProjectOnEigenPatches()
 	}
 }
 
-template < class ImageType >
-void TPatchAnalysis < ImageType >::WriteProjections()
+template < class ImageType, const int dimension >
+void TPatchAnalysis < ImageType, dimension >::WriteProjections()
 {
 	typedef typename itk::CSVNumericObjectFileWriter< typename ImageType::PixelType > CSVWriterType;
 	typename CSVWriterType::Pointer csvWriter = CSVWriterType::New();
@@ -439,15 +601,24 @@ template < class PixelType, const int dimension >
 void PatchAnalysis( ArgumentType & args )
 {
 	typedef itk::Image< PixelType, dimension > ImageType;
-	TPatchAnalysis< ImageType > patchAnalysisObject( args, dimension );
+	TPatchAnalysis< ImageType, dimension > patchAnalysisObject( args );
 	patchAnalysisObject.ReadInputImage( );
 	patchAnalysisObject.ReadMaskImage(  );
 	patchAnalysisObject.GetSamplePatchLocations( );
 	patchAnalysisObject.ExtractSamplePatches( );
 	patchAnalysisObject.LearnEigenPatches( );
+	patchAnalysisObject.ExtractAllPatches( );
+	// because all patches are reoriented to the second (non-rotationally invariant)
+	// eigenpatch, we must learn the eigenpatches even if we will in the end use
+	// rotationally invariant features.
+	if ( args.orientationInvariant )
+	{
+		patchAnalysisObject.ReorientSamplePatches();
+		patchAnalysisObject.ReorientAllPatches();
+		patchAnalysisObject.LearnEigenPatches(); // of reoriented samples
+	}
 	if( !args.eigvecName.empty() )
 		patchAnalysisObject.WriteEigenPatches( );
-	patchAnalysisObject.ExtractAllPatches( );
 	patchAnalysisObject.ProjectOnEigenPatches( );
 	patchAnalysisObject.WriteProjections( );
 }
@@ -607,24 +778,23 @@ vnl_vector< TRealType > ReorientPatchToReferenceFrame(
       RotatedPoint[ dd ] -= CenterPointOfImage2[ dd ]; 
       RotatedPointVector[ dd ] = RotatedPoint[ dd ]; 
     }
+
     // Now rotate RotatedPoint
     RotatedPointVector = ( Q_solution ) * RotatedPointVector; 
     for( unsigned int dd = 0; dd < ImageDimension; dd++ )
     {
       RotatedPoint[ dd ] = RotatedPointVector[ dd ] + CenterPointOfImage2[ dd ];
     } 
-//    std::cout << "Original Point is " << ImagePatch2[ii] << ", Reoriented is " << RotatedPoint << std::endl;
     if( Interpolator->IsInsideBuffer( RotatedPoint) )
     {
       VectorizedImagePatch2[ ii ] = Interpolator->Evaluate( RotatedPoint );
     }
-    else OK = false; 
+    else OK = false;
   }
 //  std::cout << "VectorizedImagePatch2 is " <<  VectorizedImagePatch2 << std::endl;
   // Generate image to return
-  typename  TImageType::Pointer ReorientedImage = TImageType::New();
-  ReorientedImage = ConvertVectorToSpatialImage<TImageType, 
-		  TImageType, double > (VectorizedImagePatch2, MaskImage); 
+  //typename  TImageType::Pointer ReorientedImage = TImageType::New();
+  //ReorientedImage = ConvertVectorToSpatialImage<TImageType > (VectorizedImagePatch2, MaskImage);
   /*typedef itk::NeighborhoodIterator< TImageType > NeighborhoodIteratorType;
   NeighborhoodIteratorType ReorientedRegionIterator( 
       GradientImageNeighborhood1.GetRadius(), ReorientedImage, //GradientImage1, 
