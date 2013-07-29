@@ -6,6 +6,7 @@
 #include <vnl/algo/vnl_symmetric_eigensystem.h>
 #include <itkImageRegionIterator.h>
 #include "itkNeighborhoodIterator.h"
+#include <stdio.h>
 
 template< class ImageType >
 typename ImageType::Pointer ConvertVectorToSpatialImage( vnl_vector< typename ImageType::PixelType > &Vector,
@@ -305,9 +306,8 @@ void TPatchAnalysis< ImageType, dimension >::WriteEigenPatches()
 	{
 		vnl_vector< typename ImageType::PixelType > eigvec =
 				significantPatchEigenvectors.get_column( ii );
-		std::ostringstream convert;
-		convert << ii;
-		std::string imageIndex = convert.str();
+		char imageIndex[50];
+		int j = sprintf(imageIndex, "%02u", ii);
 		eigvecWriter->SetInput( ConvertVectorToSpatialImage< ImageType>( eigvec,
 						eigvecMaskImage) );
 		std::string eigvecFileName = args.eigvecName + imageIndex + ".nii.gz" ;
@@ -415,6 +415,8 @@ void TPatchAnalysis< ImageType, dimension >::ReorientSamplePatches()
 	fixedGradientFilter->Update();
 	typename GradientImageType::Pointer fixedGradientImage = fixedGradientFilter->GetOutput();
 
+	std::cout << "vectorizedSamplePatchMatrix is " << this->vectorizedSamplePatchMatrix.rows() <<
+			"x" << this->vectorizedSamplePatchMatrix.columns() << std::endl;
 	for( long int ii = 0; ii < this->vectorizedSamplePatchMatrix.rows(); ii++)
 	{
 		vnl_vector< typename ImageType::PixelType > vectorizedPatch =
@@ -425,6 +427,7 @@ void TPatchAnalysis< ImageType, dimension >::ReorientSamplePatches()
 		movingGradientFilter->SetInput(movingImage);
 		movingGradientFilter->SetSigma(gradientSigma);
 		movingGradientFilter->Update();
+		interp1->SetInputImage(movingImage);
 		typename GradientImageType::Pointer movingGradientImage = movingGradientFilter->GetOutput();
 		vnl_vector< typename ImageType::PixelType > rotatedPatchAsVector =
 				ReorientPatchToReferenceFrame< dimension, typename ImageType::PixelType,
@@ -436,7 +439,6 @@ void TPatchAnalysis< ImageType, dimension >::ReorientSamplePatches()
 						movingGradientImage,
 						dimension,
 						interp1);
-		std::cout << " rotated like a banshee " << std::endl;
 		this->vectorizedSamplePatchMatrix.set_row(ii, rotatedPatchAsVector);
 
 
@@ -494,16 +496,17 @@ void TPatchAnalysis< ImageType, dimension >::ReorientAllPatches()
 	fixedGradientFilter->Update();
 	typename GradientImageType::Pointer fixedGradientImage = fixedGradientFilter->GetOutput();
 
-	for( long int ii = 0; ii < this->patchesForAllPointsWithinMask.rows(); ii++)
+	for( long int ii = 0; ii < this->patchesForAllPointsWithinMask.columns(); ii++)
 	{
 		vnl_vector< typename ImageType::PixelType > vectorizedPatch =
-				this->patchesForAllPointsWithinMask.get_row(ii);
+				this->patchesForAllPointsWithinMask.get_column(ii);
 		typename ImageType::Pointer movingImage = ConvertVectorToSpatialImage< ImageType >(
 				vectorizedPatch, eigenvecMaskImage);
 		NeighborhoodIteratorType movingIterator(radius, movingImage, sphereRegion);
 		movingGradientFilter->SetInput(movingImage);
 		movingGradientFilter->SetSigma(gradientSigma);
 		movingGradientFilter->Update();
+		interp1->SetInputImage(movingImage);
 		typename GradientImageType::Pointer movingGradientImage = movingGradientFilter->GetOutput();
 		vnl_vector< typename ImageType::PixelType > rotatedPatchAsVector =
 				ReorientPatchToReferenceFrame< dimension, typename ImageType::PixelType,
@@ -515,7 +518,7 @@ void TPatchAnalysis< ImageType, dimension >::ReorientAllPatches()
 						movingGradientImage,
 						dimension,
 						interp1);
-		this->patchesForAllPointsWithinMask.set_row(ii, rotatedPatchAsVector);
+		this->patchesForAllPointsWithinMask.set_column(ii, rotatedPatchAsVector);
 
 
 	}
@@ -547,12 +550,15 @@ void TPatchAnalysis< ImageType, dimension >::ProjectOnEigenPatches()
 		x = RegressionSVD.solve(PatchOfInterest);
 		eigenvectorCoefficients.set_column(i, x);
 	}
-	vnl_matrix< typename ImageType::PixelType > reconstructedPatches = significantPatchEigenvectors * eigenvectorCoefficients;
-	vnl_matrix< typename ImageType::PixelType > error = reconstructedPatches - patchesForAllPointsWithinMask;
+	vnl_matrix< typename ImageType::PixelType > reconstructedPatches =
+			significantPatchEigenvectors * eigenvectorCoefficients;
+	vnl_matrix< typename ImageType::PixelType > error =
+			reconstructedPatches - patchesForAllPointsWithinMask;
 	vnl_vector< typename ImageType::PixelType > percentError(error.columns() );
 	for( int i = 0; i < error.columns(); ++i)
 	{
-		percentError(i) = error.get_column(i).two_norm() / (patchesForAllPointsWithinMask.get_column(i).two_norm() + 1e-10);
+		percentError(i) = error.get_column(i).two_norm() /
+				(patchesForAllPointsWithinMask.get_column(i).two_norm() + 1e-10);
 	}
 	if( args.verbose > 0 )
 	{
