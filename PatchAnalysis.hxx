@@ -261,6 +261,9 @@ void TPatchAnalysis< ImageType, dimension >::ExtractSamplePatches()
 			this->vectorizedSamplePatchMatrix( i, j ) =
 					Iterator.GetPixel( indicesWithinSphere[ j ] );
 		}
+		// mean-center all patches
+		this->vectorizedSamplePatchMatrix.set_row(i, this->vectorizedSamplePatchMatrix.get_row(i) -
+				this->vectorizedSamplePatchMatrix.get_row(i).mean());
 	}
 }
 
@@ -307,7 +310,7 @@ void TPatchAnalysis< ImageType, dimension >::WriteEigenPatches()
 		vnl_vector< typename ImageType::PixelType > eigvec =
 				significantPatchEigenvectors.get_column( ii );
 		char imageIndex[50];
-		int j = sprintf(imageIndex, "%02u", ii);
+		int j = sprintf(imageIndex, "%03u", ii);
 		eigvecWriter->SetInput( ConvertVectorToSpatialImage< ImageType>( eigvec,
 						eigvecMaskImage) );
 		std::string eigvecFileName = args.eigvecName + imageIndex + ".nii.gz" ;
@@ -360,6 +363,10 @@ void TPatchAnalysis< ImageType, dimension >::ExtractAllPatches()
 		{
 			patchesForAllPointsWithinMask( j, i ) = iterator.GetPixel( indicesWithinSphere[ j ] );
 		}
+		// mean-center
+		this->patchesForAllPointsWithinMask.set_column(i,
+				this->patchesForAllPointsWithinMask.get_column(i) -
+				this->patchesForAllPointsWithinMask.get_column(i).mean());
 	}
 	if( args.verbose > 0 ) std::cout << "Recorded patches for all points." << std::endl;
 }
