@@ -577,37 +577,45 @@ void TPatchAnalysis< ImageType, dimension >::ProjectOnEigenPatches()
 template < class ImageType, const int dimension >
 void TPatchAnalysis < ImageType, dimension >::WriteProjections()
 {
-	typedef typename itk::CSVNumericObjectFileWriter< typename ImageType::PixelType > CSVWriterType;
-	typename CSVWriterType::Pointer csvWriter = CSVWriterType::New();
-	std::vector< std::string > rowNames;
-	std::vector< std::string > columnNames;
-	columnNames.push_back(""); // first column name must be blank
-	for ( long unsigned int i = 0; i < numberOfVoxelsWithinMask; i++ )
+	// convert eigenvectorCoefficients to image and write as .mha
+	typedef  itk::Image< typename ImageType::PixelType, 2 > ImageType2D;
+	typename ImageType2D::RegionType region;
+	typename ImageType2D::IndexType start;
+	start[0] = 0;
+	start[1] = 0;
+	typename ImageType2D::SizeType size;
+	size[0] = this->eigenvectorCoefficients.rows();
+	size[1] = this->eigenvectorCoefficients.columns();
+	region.SetSize(size);
+	region.SetIndex(start);
+	typename ImageType2D::Pointer image = ImageType2D::New();
+	image->SetRegions(region);
+	image->Allocate();
+
+	typename ImageType2D::IndexType pixelIndex;
+	for( long int ii = 0; ii < this->eigenvectorCoefficients.rows(); ii++)
 	{
-		std::string name = "Patch";
-		std::string imageIndex;
-		std::ostringstream convert;
-		convert << i;
-		imageIndex = convert.str();
-		name = name + imageIndex;
-		columnNames.push_back( name );
+		for(long int jj = 0; jj < this->eigenvectorCoefficients.columns(); jj++)
+		{
+			pixelIndex[0] = ii;
+			pixelIndex[1] = jj;
+			image->SetPixel(pixelIndex, this->eigenvectorCoefficients.get(ii, jj));
+		}
 	}
-	for( int i = 0; i < significantPatchEigenvectors.columns(); i++ )
+	typedef itk::ImageFileWriter< ImageType2D > WriterType;
+	typename WriterType::Pointer writer = WriterType::New();
+	writer->SetFileName(this->args.outPatchName + ".mha");
+	writer->SetInput(image);
+	try
 	{
-		std::string name = "ProjectionOfEigenvector";
-		std::string imageIndex;
-		std::ostringstream convert;
-		convert << i;
-		imageIndex = convert.str();
-		name = name + imageIndex;
-		rowNames.push_back( name );
+		writer->Update();
+	}
+	catch(itk::ExceptionObject & err)
+	{
+		std::cerr << "Exception caught writing patch projections." << std::endl;
+		std::cerr << err << std::endl;
 	}
 
-	csvWriter->SetFileName( args.outPatchName + ".csv" );
-	csvWriter->SetInput( &eigenvectorCoefficients );
-	csvWriter->SetColumnHeaders( columnNames );
-	csvWriter->SetRowHeaders( rowNames );
-	csvWriter->Update();
 }
 
 template < class PixelType, const int dimension >
