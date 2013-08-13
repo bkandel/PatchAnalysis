@@ -411,8 +411,7 @@ void TPatchAnalysis< ImageType, dimension >::ReorientSamplePatches()
 			this->indicesWithinSphere, this->args.patchSize, dimension, this->paddingVoxels);
 	//NeighborhoodIteratorType regionIterator()
 	vnl_vector< typename ImageType::PixelType > canonicalEigenPatchAsVector =
-			this->significantPatchEigenvectors.get_column(1);
-	// the SECOND eigenvector is canonical--1st is constant
+			this->significantPatchEigenvectors.get_column(0);
 	this->canonicalFrame = ConvertVectorToSpatialImage< ImageType >(
 			canonicalEigenPatchAsVector, eigenvecMaskImage );
 	NeighborhoodIteratorType fixedIterator(radius, canonicalFrame, sphereRegion);
