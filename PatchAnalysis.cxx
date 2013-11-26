@@ -48,6 +48,8 @@ void printHelp( void )
 	cout << "    -t [target variance explained=0.95]" << endl;
 	cout << "    -n [number of sample patches to take=1000]" << endl;
 	cout << "    -o compute orientation invariant eigenvectors and projections" << endl;
+	cout << "    -f [name for output eigenvector matrix]" << endl;
+	cout << "    -g [name for input eigenvector matrix]"  << endl;
 	cout << "    -v print verbose output" << endl;
 	exit( EXIT_FAILURE );
 }
@@ -57,16 +59,18 @@ int main(int argc, char * argv[] )
   ArgumentType args;
   args.inputName               = "";
   args.maskName                = "";
-  args.outPatchName            = "projectedPatches";
+  args.outProjectionName       = "projectedPatches";
   args.eigvecName              = "eigvec_";
   args.patchSize               = 3;
   args.targetVarianceExplained = 0.95;
+  args.outEigvecMatrixName     = "";
+  args.inEigvecMatrixName      = "";
   args.numberOfSamplePatches   = 1000;
   args.verbose                 = 0;
   args.orientationInvariant    = false;
   args.help                    = 0;
 
-  const char * optString = "i:m:p:e:s:t:voh";
+  const char * optString = "i:m:p:e:s:t:f:g:voh";
   int opt = 0;
   while( (opt = getopt( argc, argv, optString)) != -1 )
   {
@@ -79,7 +83,7 @@ int main(int argc, char * argv[] )
     	args.maskName = optarg;
     	break;
     case 'p':
-    	args.outPatchName = optarg;
+    	args.outProjectionName = optarg;
     	break;
     case 'e':
     	args.eigvecName = optarg;
@@ -99,6 +103,12 @@ int main(int argc, char * argv[] )
     case 'o':
     	args.orientationInvariant = true;
     	break;
+    case 'f':
+    	args.outEigvecMatrixName = optarg;
+    break;
+    case 'g':
+    	args.inEigvecMatrixName = optarg;
+    break;
     case 'h':
     	printHelp();
     	break;

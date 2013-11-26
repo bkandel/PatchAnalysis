@@ -2,14 +2,16 @@ struct ArgumentType
 {
   std::string inputName;           // -i option
   std::string maskName;            // -m option
-  std::string outPatchName;        // -p option
+  std::string outProjectionName;   // -p option FIXME--used to be 'outPatchName'
   std::string eigvecName;          // -e option
+  std::string outEigvecMatrixName; // -f option
+  std::string inEigvecMatrixName; // -g option
   int patchSize;                  // -s option
   double targetVarianceExplained; // -t option
   int numberOfSamplePatches;      // -n option
   int verbose;                    // -v option
   int help;                       // -h option
-  bool orientationInvariant;      // -o options
+  bool orientationInvariant;      // -o option
 };
 
 template < class ImageType, const int dimension >
@@ -25,6 +27,9 @@ public:
 	void ExtractAllPatches( void );
 	void LearnEigenPatches( void );
 	void WriteEigenPatches( void );
+	void WriteEigenPatchMatrix( void ); // TODO  -- done? not debugged
+	void ReadEigenPatchMatrix( void );  // TODO -- done? not debugged
+	void WritePatchMatrix( void ); // TODO -- not sure this is actually useful
 	void ReorientSamplePatches( void );
 	void ReorientAllPatches( void );
 	void ProjectOnEigenPatches( void );
@@ -35,7 +40,7 @@ private:
 	typename ImageType::Pointer                 canonicalFrame; // frame to rotate all patches to
 	typename ImageType::Pointer                 inputImage;
 	typename ImageType::Pointer                 maskImage;
-	vnl_matrix < int >                            patchSeedPoints;
+	vnl_matrix < int >                          patchSeedPoints;
 	vnl_matrix< typename ImageType::PixelType > vectorizedSamplePatchMatrix;
 	std::vector< unsigned int >                  indicesWithinSphere;
 	std::vector< double >                         weights;
