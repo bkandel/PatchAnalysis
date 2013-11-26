@@ -1,6 +1,6 @@
-#include<iostream>
-#include<stdio.h>
-#include<stdlib.h>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 #include "vnl/vnl_matrix.h"
 #include "vnl/vnl_vector.h"
 #include <vnl/algo/vnl_symmetric_eigensystem.h>
@@ -603,7 +603,7 @@ void TPatchAnalysis < ImageType, dimension >::WriteProjections()
 	}
 	typedef itk::ImageFileWriter< ImageType2D > WriterType;
 	typename WriterType::Pointer writer = WriterType::New();
-	writer->SetFileName(this->args.outPatchName + ".mha");
+	writer->SetFileName(this->args.outProjectionName + ".mha");
 	writer->SetInput(image);
 	try
 	{
@@ -617,6 +617,81 @@ void TPatchAnalysis < ImageType, dimension >::WriteProjections()
 
 }
 
+
+template < class ImageType, const int dimension >
+void TPatchAnalysis < ImageType, dimension >::WriteEigenPatchMatrix()
+{
+	// convert eigenvectorCoefficients to image and write as .mha
+	typedef  itk::Image< typename ImageType::PixelType, 2 > ImageType2D;
+	typename ImageType2D::RegionType region;
+	typename ImageType2D::IndexType start;
+	start[0] = 0;
+	start[1] = 0;
+	typename ImageType2D::SizeType size;
+	size[0] = this->significantPatchEigenvectors.rows();
+	size[1] = this->significantPatchEigenvectors.columns();
+	region.SetSize(size);
+	region.SetIndex(start);
+	typename ImageType2D::Pointer image = ImageType2D::New();
+	image->SetRegions(region);
+	image->Allocate();
+
+	typename ImageType2D::IndexType pixelIndex;
+	for( long int ii = 0; ii < this->significantPatchEigenvectors.rows(); ii++)
+	{
+		for(long int jj = 0; jj < this->significantPatchEigenvectors.columns(); jj++)
+		{
+			pixelIndex[0] = ii;
+			pixelIndex[1] = jj;
+			image->SetPixel(pixelIndex, this->significantPatchEigenvectors.get(ii, jj));
+		}
+	}
+	typedef itk::ImageFileWriter< ImageType2D > WriterType;
+	typename WriterType::Pointer writer = WriterType::New();
+	writer->SetFileName(this->args.outEigvecMatrixName + ".mha");
+	writer->SetInput(image);
+	try
+	{
+		writer->Update();
+	}
+	catch(itk::ExceptionObject & err)
+	{
+		std::cerr << "Exception caught writing patch projections." << std::endl;
+		std::cerr << err << std::endl;
+	}
+}
+
+template < class ImageType, const int dimension >
+void TPatchAnalysis< ImageType, dimension >::ReadEigenPatchMatrix()
+{
+	typedef  itk::Image< typename ImageType::PixelType, 2 > ImageType2D;
+	typedef itk::ImageFileReader< ImageType2D > ReaderType;
+	typename ReaderType::Pointer eigenPatchMatrixReader = ReaderType::New();
+	eigenPatchMatrixReader->SetFileName( args.inEigvecMatrixName );
+	try
+	{
+		eigenPatchMatrixReader->Update();
+	}
+	catch( itk::ExceptionObject & err )
+	{
+		std::cerr << "Exception caught while reading eigenpatch matrix." << std::endl;
+		std::cerr << err << std::endl;
+	}
+	typename ImageType2D::Pointer eigenvecImage = ImageType2D::New();
+	eigenvecImage = eigenPatchMatrixReader->GetOutput();
+	typedef itk::ImageRegionIteratorWithIndex< ImageType2D > IteratorType;
+	IteratorType eigenPatchMatrixImageIterator( eigenvecImage, eigenvecImage->GetLargestPossibleRegion() );
+	typename ImageType2D::SizeType size = eigenvecImage->GetLargestPossibleRegion().GetSize();
+	significantPatchEigenvectors.set_size( size[0], size[1] );
+	for(eigenPatchMatrixImageIterator.GoToBegin(); !eigenPatchMatrixImageIterator.IsAtEnd();
+			++eigenPatchMatrixImageIterator)
+	{
+		typename ImageType2D::IndexType idx = eigenPatchMatrixImageIterator.GetIndex();
+		significantPatchEigenvectors(idx[0], idx[1]) = eigenvecImage->GetPixel(idx);
+	}
+
+}
+
 template < class PixelType, const int dimension >
 void PatchAnalysis( ArgumentType & args )
 {
@@ -626,19 +701,27 @@ void PatchAnalysis( ArgumentType & args )
 	patchAnalysisObject.ReadMaskImage(  );
 	patchAnalysisObject.GetSamplePatchLocations( );
 	patchAnalysisObject.ExtractSamplePatches( );
-	patchAnalysisObject.LearnEigenPatches( );
+	if ( args.inEigvecMatrixName.empty() )
+	{
+		patchAnalysisObject.LearnEigenPatches( );
+	} else {
+		patchAnalysisObject.ReadEigenPatchMatrix();
+	}
 	patchAnalysisObject.ExtractAllPatches( );
-	// because all patches are reoriented to the second (non-rotationally invariant)
+	// because all patches are reoriented to the first (non-rotationally invariant)
 	// eigenpatch, we must learn the eigenpatches even if we will in the end use
 	// rotationally invariant features.
 	if ( args.orientationInvariant )
 	{
 		patchAnalysisObject.ReorientSamplePatches();
 		patchAnalysisObject.ReorientAllPatches();
-		patchAnalysisObject.LearnEigenPatches(); // of reoriented samples
+		if ( args.inEigvecMatrixName.empty() )
+			patchAnalysisObject.LearnEigenPatches(); // of reoriented samples
 	}
 	if( !args.eigvecName.empty() )
 		patchAnalysisObject.WriteEigenPatches( );
+	if( !args.outEigvecMatrixName.empty() )
+		patchAnalysisObject.WriteEigenPatchMatrix() ;
 	patchAnalysisObject.ProjectOnEigenPatches( );
 	patchAnalysisObject.WriteProjections( );
 }
