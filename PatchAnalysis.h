@@ -6,6 +6,7 @@ struct ArgumentType
   std::string eigvecName;          // -e option
   std::string outEigvecMatrixName; // -f option
   std::string inEigvecMatrixName; // -g option
+  std::string outPatchName;       // -q option
   int patchSize;                  // -s option
   double targetVarianceExplained; // -t option
   int numberOfSamplePatches;      // -n option
@@ -29,7 +30,7 @@ public:
 	void WriteEigenPatches( void );
 	void WriteEigenPatchMatrix( void ); // TODO  -- done? not debugged
 	void ReadEigenPatchMatrix( void );  // TODO -- done? not debugged
-	void WritePatchMatrix( void ); // TODO -- not sure this is actually useful
+	void WritePatchMatrix( void );
 	void ReorientSamplePatches( void );
 	void ReorientAllPatches( void );
 	void ProjectOnEigenPatches( void );

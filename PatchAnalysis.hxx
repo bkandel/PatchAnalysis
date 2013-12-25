@@ -619,6 +619,50 @@ void TPatchAnalysis < ImageType, dimension >::WriteProjections()
 
 
 template < class ImageType, const int dimension >
+void TPatchAnalysis < ImageType, dimension >::WritePatchMatrix()
+{
+	// write out patches for visualization
+	typedef  itk::Image< typename ImageType::PixelType, 2 > ImageType2D;
+	typename ImageType2D::RegionType region;
+	typename ImageType2D::IndexType start;
+	start[0] = 0;
+	start[1] = 0;
+	typename ImageType2D::SizeType size;
+	size[0] = this->patchesForAllPointsWithinMask.rows();
+	size[1] = this->patchesForAllPointsWithinMask.columns();
+	region.SetSize(size);
+	region.SetIndex(start);
+	typename ImageType2D::Pointer image = ImageType2D::New();
+	image->SetRegions(region);
+	image->Allocate();
+
+	typename ImageType2D::IndexType pixelIndex;
+	for( long int ii = 0; ii < this->patchesForAllPointsWithinMask.rows(); ii++)
+	{
+		for(long int jj = 0; jj < this->patchesForAllPointsWithinMask.columns(); jj++)
+		{
+			pixelIndex[0] = ii;
+			pixelIndex[1] = jj;
+			image->SetPixel(pixelIndex, this->patchesForAllPointsWithinMask.get(ii, jj));
+		}
+	}
+	typedef itk::ImageFileWriter< ImageType2D > WriterType;
+	typename WriterType::Pointer writer = WriterType::New();
+	writer->SetFileName(this->args.outPatchName + ".mha");
+	writer->SetInput(image);
+	try
+	{
+		writer->Update();
+	}
+	catch(itk::ExceptionObject & err)
+	{
+		std::cerr << "Exception caught writing patches." << std::endl;
+		std::cerr << err << std::endl;
+	}
+
+}
+
+template < class ImageType, const int dimension >
 void TPatchAnalysis < ImageType, dimension >::WriteEigenPatchMatrix()
 {
 	// convert eigenvectorCoefficients to image and write as .mha
@@ -724,6 +768,8 @@ void PatchAnalysis( ArgumentType & args )
 		patchAnalysisObject.WriteEigenPatchMatrix() ;
 	patchAnalysisObject.ProjectOnEigenPatches( );
 	patchAnalysisObject.WriteProjections( );
+	if (!args.outPatchName.empty())
+		patchAnalysisObject.WritePatchMatrix();
 }
 
 

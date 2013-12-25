@@ -68,9 +68,10 @@ int main(int argc, char * argv[] )
   args.numberOfSamplePatches   = 1000;
   args.verbose                 = 0;
   args.orientationInvariant    = false;
+  args.outPatchName            = "";
   args.help                    = 0;
 
-  const char * optString = "i:m:p:e:s:t:f:g:voh";
+  const char * optString = "i:m:p:e:s:t:f:g:q:voh";
   int opt = 0;
   while( (opt = getopt( argc, argv, optString)) != -1 )
   {
@@ -105,10 +106,13 @@ int main(int argc, char * argv[] )
     	break;
     case 'f':
     	args.outEigvecMatrixName = optarg;
-    break;
+    	break;
     case 'g':
     	args.inEigvecMatrixName = optarg;
-    break;
+    	break;
+    case 'q':
+    	args.outPatchName = optarg;
+    	break;
     case 'h':
     	printHelp();
     	break;
