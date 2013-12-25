@@ -13,6 +13,7 @@ struct ArgumentType
   int verbose;                    // -v option
   int help;                       // -h option
   bool orientationInvariant;      // -o option
+  bool meanCenter;                // -c option
 };
 
 template < class ImageType, const int dimension >

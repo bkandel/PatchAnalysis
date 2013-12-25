@@ -262,8 +262,11 @@ void TPatchAnalysis< ImageType, dimension >::ExtractSamplePatches()
 					Iterator.GetPixel( indicesWithinSphere[ j ] );
 		}
 		// mean-center all patches
-		this->vectorizedSamplePatchMatrix.set_row(i, this->vectorizedSamplePatchMatrix.get_row(i) -
-				this->vectorizedSamplePatchMatrix.get_row(i).mean());
+		if(args.meanCenter) {
+			this->vectorizedSamplePatchMatrix.set_row(i, this->vectorizedSamplePatchMatrix.get_row(i) -
+					this->vectorizedSamplePatchMatrix.get_row(i).mean());
+
+		}
 	}
 }
 
@@ -364,9 +367,11 @@ void TPatchAnalysis< ImageType, dimension >::ExtractAllPatches()
 			patchesForAllPointsWithinMask( j, i ) = iterator.GetPixel( indicesWithinSphere[ j ] );
 		}
 		// mean-center
-		this->patchesForAllPointsWithinMask.set_column(i,
-				this->patchesForAllPointsWithinMask.get_column(i) -
-				this->patchesForAllPointsWithinMask.get_column(i).mean());
+		if(args.meanCenter) {
+			this->patchesForAllPointsWithinMask.set_column(i,
+					this->patchesForAllPointsWithinMask.get_column(i) -
+					this->patchesForAllPointsWithinMask.get_column(i).mean());
+		}
 	}
 	if( args.verbose > 0 ) std::cout << "Recorded patches for all points." << std::endl;
 }

@@ -51,6 +51,7 @@ void printHelp( void )
 	cout << "    -f [name for output eigenvector matrix]" << endl;
 	cout << "    -g [name for input eigenvector matrix]"  << endl;
 	cout << "    -v print verbose output" << endl;
+	cout << "    -c mean center patches 0/1 (default=true)" << endl;
 	exit( EXIT_FAILURE );
 }
 
@@ -69,9 +70,10 @@ int main(int argc, char * argv[] )
   args.verbose                 = 0;
   args.orientationInvariant    = false;
   args.outPatchName            = "";
+  args.meanCenter              = true;
   args.help                    = 0;
 
-  const char * optString = "i:m:p:e:s:t:f:g:q:voh";
+  const char * optString = "i:m:p:e:s:t:f:g:q:c:voh";
   int opt = 0;
   while( (opt = getopt( argc, argv, optString)) != -1 )
   {
@@ -112,6 +114,16 @@ int main(int argc, char * argv[] )
     	break;
     case 'q':
     	args.outPatchName = optarg;
+    	break;
+    case 'c':
+    	if(atoi(optarg) == 0) {
+    		args.meanCenter = false;
+    	} else if(atoi(optarg) == 1){
+    		args.meanCenter = true;
+    	} else {
+    		std::cout << "Error: c option must be 0 or 1" << std::endl;
+    		printHelp();
+    	}
     	break;
     case 'h':
     	printHelp();
