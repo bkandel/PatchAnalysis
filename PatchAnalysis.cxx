@@ -73,7 +73,7 @@ int main(int argc, char * argv[] )
   args.meanCenter              = true;
   args.help                    = 0;
 
-  const char * optString = "i:m:p:e:s:t:f:g:q:c:voh";
+  const char * optString = "i:m:p:e:s:t:f:g:n:q:c:voh";
   int opt = 0;
   while( (opt = getopt( argc, argv, optString)) != -1 )
   {
