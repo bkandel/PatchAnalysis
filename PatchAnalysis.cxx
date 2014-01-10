@@ -62,7 +62,7 @@ int main(int argc, char * argv[] )
   args.inputName               = "";
   args.maskName                = "";
   args.outProjectionName       = "projectedPatches";
-  args.eigvecName              = "eigvec_";
+  args.eigvecName              = "";
   args.patchSize               = 3;
   args.targetVarianceExplained = 0.95;
   args.outEigvecMatrixName     = "";
