@@ -283,18 +283,23 @@ void TPatchAnalysis< ImageType, dimension >::LearnEigenPatches( void )
     double partialSumOfEigenvalues = 0.0;
     double percentVarianceExplained = 0.0;
 	int  i = 0;
-	while( percentVarianceExplained < args.targetVarianceExplained && i < svd.rank())
+	if ( args.targetVarianceExplained < 1 )
 	{
-		partialSumOfEigenvalues += svd.W(i, i);
-	    percentVarianceExplained = partialSumOfEigenvalues /
-	                                      sumOfEigenvalues;
-	    i++;
-	}
-	int numberOfSignificantEigenvectors = i;
-	if( args.verbose > 0 )
-	{
-		std::cout << "It took " << numberOfSignificantEigenvectors << " eigenvectors to reach " <<
-				args.targetVarianceExplained * 100 << "% variance explained." << std::endl;
+		while( percentVarianceExplained < args.targetVarianceExplained && i < svd.rank())
+		{
+			partialSumOfEigenvalues += svd.W(i, i);
+			percentVarianceExplained = partialSumOfEigenvalues /
+											  sumOfEigenvalues;
+			i++;
+		}
+		int numberOfSignificantEigenvectors = i;
+		if( args.verbose > 0 )
+		{
+			std::cout << "It took " << numberOfSignificantEigenvectors << " eigenvectors to reach " <<
+					args.targetVarianceExplained * 100 << "% variance explained." << std::endl;
+		}
+	} else {
+		i = int(args.targetVarianceExplained);
 	}
 	significantPatchEigenvectors.set_size( patchEigenvectors.rows(), i);
 	significantPatchEigenvectors = patchEigenvectors.get_n_columns(0, i);
