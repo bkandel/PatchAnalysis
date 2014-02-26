@@ -949,12 +949,11 @@ vnl_vector< TRealType > ReorientPatchToReferenceFrame(
    * you can end up with flipped images that are negatively correlated with each other.
    * Here we check for that and correct if necessary.
    */
-  if(inner_product(VectorizedImagePatch1, VectorizedImagePatch2) < 0)
-  {
-	  Image1Eigvec1 = -Image1Eigvec1;
-	  Image1Eigvec2 = -Image1Eigvec2;
-	  Image2Eigvec1 = -Image2Eigvec1;
-	  Image2Eigvec2 = -Image2Eigvec2;
+  MeanOfImagePatch2 = VectorizedImagePatch2.mean();
+  CenteredVectorizedImagePatch2 = ( VectorizedImagePatch2 - MeanOfImagePatch2 );
+
+  if(inner_product(CenteredVectorizedImagePatch1, CenteredVectorizedImagePatch2) < 0)
+  {       
 
 	  vnl_matrix< RealType > B = outer_product( Image1Eigvec1, Image2Eigvec1 );
 	  if( ImageDimension == 3)
@@ -964,6 +963,21 @@ vnl_vector< TRealType > ReorientPatchToReferenceFrame(
 	  }
 	  vnl_svd< RealType > WahbaSVD( B );
 	  vnl_matrix< RealType > Q_solution = WahbaSVD.V() * WahbaSVD.U().transpose();
+          vnl_matrix< RealType > rotationMat; 
+          if(ImageDimension == 2) 
+          {
+            const RealType values[4] = {-1.0,0.0,0.0,-1.0}; 
+            rotationMat.set_size(2, 2); 
+            rotationMat.set(values); 
+          } else if( ImageDimension == 3) 
+          { 
+            const RealType values[9] = {1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0};
+            rotationMat.set_size(3, 3); 
+            rotationMat.set(values);
+          }
+          
+          Q_solution = Q_solution * rotationMat; 
+
 	  // Now rotate the points to the same frame and sample neighborhoods again.
 	  for( unsigned int ii = 0; ii < NumberOfIndicesWithinSphere; ii++ )
 	  {
