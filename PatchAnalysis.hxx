@@ -944,7 +944,54 @@ vnl_vector< TRealType > ReorientPatchToReferenceFrame(
     }
     else OK = false;
   }
-    return VectorizedImagePatch2; 
+
+  /* This is a nasty little detail:  Because the eigenvector is in the positive quadrant,
+   * you can end up with flipped images that are negatively correlated with each other.
+   * Here we check for that and correct if necessary.
+   */
+  if(inner_product(VectorizedImagePatch1, VectorizedImagePatch2) < 0)
+  {
+	  Image1Eigvec1 = -Image1Eigvec1;
+	  Image1Eigvec2 = -Image1Eigvec2;
+	  Image2Eigvec1 = -Image2Eigvec1;
+	  Image2Eigvec2 = -Image2Eigvec2;
+
+	  vnl_matrix< RealType > B = outer_product( Image1Eigvec1, Image2Eigvec1 );
+	  if( ImageDimension == 3)
+	  {
+		  B = outer_product( Image1Eigvec1, Image2Eigvec1 ) +
+				  outer_product( Image1Eigvec2, Image2Eigvec2 );
+	  }
+	  vnl_svd< RealType > WahbaSVD( B );
+	  vnl_matrix< RealType > Q_solution = WahbaSVD.V() * WahbaSVD.U().transpose();
+	  // Now rotate the points to the same frame and sample neighborhoods again.
+	  for( unsigned int ii = 0; ii < NumberOfIndicesWithinSphere; ii++ )
+	  {
+		  PointType RotatedPoint = ImagePatch2[ ii ];
+		  // We also need vector representation of the point values
+		  vnl_vector< RealType > RotatedPointVector( RotatedPoint.Size(), 0 );
+		  // First move center of Patch 1 to center of Patch 2
+		  for( unsigned int dd = 0; dd < ImageDimension; dd++ )
+		  {
+			  RotatedPoint[ dd ] -= CenterPointOfImage2[ dd ];
+			  RotatedPointVector[ dd ] = RotatedPoint[ dd ];
+		  }
+
+		  // Now rotate RotatedPoint
+		  RotatedPointVector = ( Q_solution ) * RotatedPointVector;
+		  for( unsigned int dd = 0; dd < ImageDimension; dd++ )
+		  {
+			  RotatedPoint[ dd ] = RotatedPointVector[ dd ] + CenterPointOfImage2[ dd ];
+		  }
+		  if( Interpolator->IsInsideBuffer( RotatedPoint) )
+		  {
+			  VectorizedImagePatch2[ ii ] = Interpolator->Evaluate( RotatedPoint );
+		  }
+		  else OK = false;
+	  }
+
+  }
+  return VectorizedImagePatch2;
 }
 
 
