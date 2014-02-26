@@ -42,10 +42,11 @@ void printHelp( void )
 	cout << "OPTIONS:" << endl;
 	cout << "    -i <inputName> " << endl;
 	cout << "    -m <mask> " << endl;
-	cout << "    -p [prefix for patch image outputs]" << endl;
+	cout << "    -p [prefix for projection image outputs]" << endl;
+	cout << "    -q [prefix for patch matrix output]" << endl;
 	cout << "    -e [prefix for eigenvector image outputs]  If not set, eigenvectors are not written." << endl;
 	cout << "    -s [size of patches=3]" << endl;
-	cout << "    -t [target variance explained=0.95]" <<
+	cout << "    -t [target variance explained=0.95] " <<
 			"If greater than 1, number of eigenvectors to retain." << endl;
 	cout << "    -n [number of sample patches to take=1000]" << endl;
 	cout << "    -o compute orientation invariant eigenvectors and projections" << endl;
