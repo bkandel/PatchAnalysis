@@ -912,19 +912,13 @@ vnl_vector< TRealType > ReorientPatchToReferenceFrame(
    * Refs: http://journals.iucr.org/a/issues/1976/05/00/a12999/a12999.pdf 
    *       http://www.control.auc.dk/~tb/best/aug23-Bak-svdalg.pdf */
   vnl_matrix< RealType > B = outer_product( Image1Eigvec1, Image2Eigvec1 );
- /* std::cout << "Image1Eigvec1 is " <<  Image1Eigvec1 << std::endl;
-  std::cout << "Image1Eigvec2 " << Image1Eigvec2 << std::endl;
-  std::cout << "Image2Eigvec1 is " << Image2Eigvec1 << std::endl;
-  std::cout << "Image2Eigvec2 is " << Image2Eigvec2 << std::endl;*/
   if( ImageDimension == 3)
   {
     B = outer_product( Image1Eigvec1, Image2Eigvec1 ) + 
         outer_product( Image1Eigvec2, Image2Eigvec2 ); 
   }
   vnl_svd< RealType > WahbaSVD( B );
-//  std::cout << "B is " << B << std::endl;
   vnl_matrix< RealType > Q_solution = WahbaSVD.V() * WahbaSVD.U().transpose();
-//  std::cout << "Q_solution is " << Q_solution << std::endl;
   // Now rotate the points to the same frame and sample neighborhoods again.
   for( unsigned int ii = 0; ii < NumberOfIndicesWithinSphere; ii++ )
   {
@@ -950,22 +944,6 @@ vnl_vector< TRealType > ReorientPatchToReferenceFrame(
     }
     else OK = false;
   }
-//  std::cout << "VectorizedImagePatch2 is " <<  VectorizedImagePatch2 << std::endl;
-  // Generate image to return
-  //typename  TImageType::Pointer ReorientedImage = TImageType::New();
-  //ReorientedImage = ConvertVectorToSpatialImage<TImageType > (VectorizedImagePatch2, MaskImage);
-  /*typedef itk::NeighborhoodIterator< TImageType > NeighborhoodIteratorType;
-  NeighborhoodIteratorType ReorientedRegionIterator( 
-      GradientImageNeighborhood1.GetRadius(), ReorientedImage, //GradientImage1, 
-      GradientImageNeighborhood1.GetBoundingBoxAsImageRegion()); 
-
-  for( unsigned int ii = 0; ii < IndicesWithinSphere.size(); ii++)
-  {
-    ReorientedRegionIterator.SetPixel( IndicesWithinSphere[ ii ],  
-	VectorizedImagePatch2[ ii ] );
-  }*/
-
-//  return ReorientedImage; 
     return VectorizedImagePatch2; 
 }
 
