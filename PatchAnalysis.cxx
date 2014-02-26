@@ -42,16 +42,16 @@ void printHelp( void )
 	cout << "OPTIONS:" << endl;
 	cout << "    -i <inputName> " << endl;
 	cout << "    -m <mask> " << endl;
-	cout << "    -p [prefix for projection image outputs]" << endl;
-	cout << "    -q [prefix for patch matrix output]" << endl;
+	cout << "    -p [prefix for patch image outputs]" << endl;
 	cout << "    -e [prefix for eigenvector image outputs]  If not set, eigenvectors are not written." << endl;
 	cout << "    -s [size of patches=3]" << endl;
-	cout << "    -t [target variance explained=0.95] " <<
-			"If greater than 1, number of eigenvectors to retain." << endl;
+	cout << "    -t [target variance explained=0.95]" <<
+			" If greater than 1, number of eigenvectors to retain." << endl;
 	cout << "    -n [number of sample patches to take=1000]" << endl;
 	cout << "    -o compute orientation invariant eigenvectors and projections" << endl;
 	cout << "    -f [name for output eigenvector matrix]" << endl;
 	cout << "    -g [name for input eigenvector matrix]"  << endl;
+	cout << "    -q [name for output patch matrix]"       << endl;
 	cout << "    -v print verbose output" << endl;
 	cout << "    -c mean center patches 0/1 (default=true)" << endl;
 	exit( EXIT_FAILURE );
