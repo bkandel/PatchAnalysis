@@ -42,7 +42,7 @@ void printHelp( void )
 	cout << "OPTIONS:" << endl;
 	cout << "    -i <inputName> " << endl;
 	cout << "    -m <mask> " << endl;
-	cout << "    -p [prefix for patch image outputs]" << endl;
+	cout << "    -p [prefix for patch projection outputs]" << endl;
 	cout << "    -e [prefix for eigenvector image outputs]  If not set, eigenvectors are not written." << endl;
 	cout << "    -s [size of patches=3]" << endl;
 	cout << "    -t [target variance explained=0.95]" <<
